@@ -8750,7 +8750,8 @@ tells the two apart: a spec compiles to itself, and is never cached.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Everything this spec takes: its target selector's reads, its own, its shapes, then its Validator's.</p>
+        <p>Everything this spec takes: its target selector's reads, its own, its shapes, then its
+Validator's.</p>
 <p>On a <code>many</code> spec the Validator's parameters are each row's, so the
 top level is the spec's <code>reads</code>, its <code>shapes</code> and then the list itself: a
 required array under <code>many_argument</code> whose rows are the Validator's
@@ -8786,7 +8787,7 @@ Validator whose <code>parameters</code> declares the keyword (see
 
     <div class="doc doc-contents ">
 
-        <p>The presenter the dispatch value is rendered with: this spec's or its output selector's.</p>
+        <p>The presenter the dispatch value renders with: this spec's or its output selector's.</p>
 
 
     </div>
@@ -9037,7 +9038,8 @@ and added to <code>reads</code> after the author's own, so the schema, the
 closed argument set and the shape check all cover them, and a
 filter named like a read declared differently is refused here,
 where a difference in labels alone is no difference and the read
-as the author wrote it stands. Its <code>data</code> is the arguments the call was sent for those names. Needs
+as the author wrote it stands. Its <code>data</code> is the arguments the call was sent for those
+names. Needs
 the <code>[filter]</code> extra to read a real FilterSet.</p>
               </div>
             </td>
@@ -9068,6 +9070,31 @@ project's own annotation is the worst way for this to fail.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.selector_spec.SelectorSpec.row_object">row_object</span></code></td>
+            <td>
+                  <code><span title="str">str</span> | <span title="collections.abc.Callable">Callable</span>[[<span title="typing.Any">Any</span>], <span title="typing.Any">Any</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>How to find the model instance in a row that wraps one - a
+tree node, a dataclass row, a table cell builder - so its
+<code>affordances</code> can be answered: an attribute name, read with
+<code>getattr</code>, or a sync callable taking the row and returning the
+instance. <code>None</code>, the default, answers model and mapping rows as
+they are. Set, it applies to every row, model and mapping rows
+included: the answers are set as attributes on the instance it
+finds, one query per model for the whole list as for model rows,
+and the row itself comes back unchanged, so a frozen wrapper works.
+It must find a saved model instance, or <code>None</code> for a row with no
+object, which is answered as a row the answers query did not find;
+anything else is refused at dispatch. A <code>QuerySet</code> result is
+refused beside it, since its rows are answered in SQL as the model
+itself. Anything but a non-empty string or a callable is refused at
+construction, and so is an async callable.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.selector_spec.SelectorSpec.kwargs">kwargs</span></code></td>
             <td>
                   <code><span title="collections.abc.Callable">Callable</span>[..., <span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]] | None</code>
@@ -9081,7 +9108,8 @@ author's value whatever the caller sent - a tenant, a project scope.
 A value of <code>UNSET</code> declines its key and leaves the caller's in
 place, unless the key is one its <code>TypedDict</code> return annotation
 says it fills: the caller's value for that is dropped once
-checked, so declining or leaving it out leaves it absent. Annotate its return as a <code>TypedDict</code> and <code>provider_keys</code>
+checked, so declining or leaving it out leaves it absent. Annotate its return as a
+<code>TypedDict</code> and <code>provider_keys</code>
 reads which keys it fills before it runs, and a read it fills is
 not demanded of the caller. On a target selector it scopes the
 lookup, and a filled key that the service spec's <code>reads</code> or its
@@ -10178,7 +10206,8 @@ error arose.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The top-level arguments the call left out, sorted: those with a message coded <code>"required"</code>.</p>
+        <p>The top-level arguments the call left out, sorted: those with a message coded
+<code>"required"</code>.</p>
 <p>Any refusal coded <code>"required"</code> counts - the shape check, a selector
 refusing a read nothing filled, and the Validator adapters (dataclass,
 pydantic, forms), which code it too - and it is the code DRF gives
@@ -10227,7 +10256,9 @@ The code is read and not the words
 
 
 
-        <p>A message in an <a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a> tree, carrying the code of the mistake it names.</p>
+        <p>A message in an
+<a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a> tree,
+carrying the code of the mistake it names.</p>
 <p>The words are for a person and are translated; the <code>code</code> is for a
 program and is not. Every refusal the kernel and its shipped adapters
 make carries one - the shape check, <code>coerce_flat</code>,
@@ -10246,7 +10277,8 @@ hashing, <code>json.dumps</code>, <code>%</code>-formatting and <code>repr</code
 <code>str</code>, and the code takes no part in any of them: a tree with codes
 compares equal to the same tree written with plain strings, the body a
 transport writes is unchanged by them, and so is the text <code>str</code> makes of
-a tree, which a log line or Django's <code>BadRequest</code> carries. That is the difference from DRF's <code>ErrorDetail</code>,
+a tree, which a log line or Django's <code>BadRequest</code> carries. That is the difference from DRF's
+<code>ErrorDetail</code>,
 whose equality reads the code too, and why this is not one. Read the code
 with <code>getattr(message, "code", None)</code>, since a Validator's own messages
 reach the same tree as it raised them, a plain <code>str</code> among them.</p>
@@ -10318,7 +10350,8 @@ reach the same tree as it raised them, a plain <code>str</code> among them.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Every message in the refusal tree <code>value</code>, each with its path from the root: <code>books.1.title</code>.</p>
+        <p>Every message in the refusal tree <code>value</code>, each with its path from the root:
+<code>books.1.title</code>.</p>
 <p>The tree <code>InvalidArguments</code> carries: a key is a step of the path, a
 row's index included, and a <code>NON_FIELD_KEYS</code> key adds none. A list is
 the tree's leaf, so its messages share the path, and only a list:
@@ -10462,7 +10495,8 @@ refused where it is written.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Validate a bound <code>form</code> as its <code>full_clean()</code> does, refusing a number no integer column holds.</p>
+        <p>Validate a bound <code>form</code> as its <code>full_clean()</code> does, refusing a number no integer column
+holds.</p>
 <p>Django's own validation hands such a number to the database driver in two
 places, and SQLite's raises <code>OverflowError</code> for one past 64 bits: a
 model choice field matching its key, and a <code>ModelForm</code>'s uniqueness
@@ -10869,7 +10903,8 @@ spread by name, <code>data</code> under its own name, and <code>pool</code> besi
 <li><code>data</code> is the validated object as a whole, which a service declaring
   <code>data</code> receives. For a mapping Validator it is <code>values</code> itself; for
   <a class="autorefs autorefs-internal" title="DataclassValidator" href="#django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator"><code>DataclassValidator</code></a>
-  and <a class="autorefs autorefs-internal" title="PydanticValidator" href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator"><code>PydanticValidator</code></a>
+  and
+  <a class="autorefs autorefs-internal" title="PydanticValidator" href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator"><code>PydanticValidator</code></a>
   it is the instance, whose fields <code>values</code> holds.</li>
 <li><code>pool</code> is any other value the Validator binds for this one call, such
   as the bound object a library validated through, so a service can ask
@@ -11074,7 +11109,8 @@ but its confirmation page still reads what the result declares.</p>
 Presenter never has to guess whether it was handed a row or a collection of
 them.</p>
 <p><code>presented()</code> is what dispatch's <code>present</code> asks for a single value: one
-value and the call's <a class="autorefs autorefs-internal" title="PresentationContext
+value and the call's
+<a class="autorefs autorefs-internal" title="PresentationContext
 
 
   
@@ -11446,7 +11482,8 @@ that is what goes in, this is what comes out.</p>
 
 
         <p>One field of an operation's output, declared without rendering anything.</p>
-<p>The output-side counterpart of <a class="autorefs autorefs-internal" title="Parameter
+<p>The output-side counterpart of
+<a class="autorefs autorefs-internal" title="Parameter
 
 
   
@@ -11558,7 +11595,8 @@ reads the markings into an
   
       dataclass
   " href="#django_service_specs.output.audience_projection.AudienceProjection"><code>AudienceProjection</code></a>,
-which <a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+which
+<a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
 applies to the presented value and
 <a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
 to the schema. A caller that names none, which is every HTTP response, is
@@ -11858,7 +11896,8 @@ and <a class="autorefs autorefs-internal" title="spec_output_schema" href="#djan
 rather than reading the declaration again per call.</p>
 <p>One projection drives both
 <a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a>
-and <a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>,
+and
+<a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>,
 which is what keeps the advertised schema describing the payload sent.</p>
 
 
@@ -12089,7 +12128,8 @@ which is the one failure the projection exists to make impossible.</p>
 
   
       dataclass
-  " href="#django_service_specs.output.output.Output"><code>Output</code></a> <code>spec</code> presents.</p>
+  " href="#django_service_specs.output.output.Output"><code>Output</code></a> <code>spec</code>
+presents.</p>
 <p>The output is <code>spec.output()</code>: a selector spec's presenter's, or a
 service spec's own presenter's, or its output selector's when it declares
 none. A transport that registers its tools up front calls this once per
@@ -12218,7 +12258,9 @@ new payload and never modifies <code>payload</code>.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Apply to a schema the projection <a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a> applies to the payload.</p>
+        <p>Apply to a schema the projection
+<a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a> applies to the
+payload.</p>
 <p>Four changes, each the mirror of one the payload undergoes:</p>
 <ul>
 <li>hidden properties are removed, and dropped from <code>required</code>, which is
@@ -12252,7 +12294,8 @@ new payload and never modifies <code>payload</code>.</p>
   value before, choices included. Its <code>title</code> and <code>description</code> are
   kept, and so is a <code>null</code> the property admitted - however it stated one,
   as a type, an <code>anyOf</code> member, <code>None</code> in an <code>enum</code> or a <code>oneOf</code>
-  entry for a labelled choice - since a null is never formatted. The type is written from <code>produces</code> rather than
+  entry for a labelled choice - since a null is never formatted. The type is written from
+  <code>produces</code> rather than
   taken from the fragment, so a renderer cannot contradict its own
   advertisement, and a fragment's <code>enum</code> lists the null too, and its
   <code>const</code> becomes an <code>enum</code> of that value and a null, where the
@@ -12297,7 +12340,8 @@ itself; anything else returns a new schema and never modifies <code>schema</code
 
     <div class="doc doc-contents first">
 
-        <p><a class="autorefs autorefs-internal" title="parameters_schema" href="#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a> over <code>spec.parameters()</code>.</p>
+        <p><a class="autorefs autorefs-internal" title="parameters_schema" href="#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a> over
+<code>spec.parameters()</code>.</p>
 <p>The whole argument set dispatch checks: a selector spec's <code>reads</code> and
 <code>shapes</code>, or a service spec's target selector's <code>reads</code>, its own, its
 <code>shapes</code>, then its Validator's parameters. A <code>many</code> service spec's is
@@ -12357,7 +12401,9 @@ Validator is asked with it, as <code>spec.parameters(call_context=...)</code> as
 
     <div class="doc doc-contents first">
 
-        <p>What a caller is asked to send <code>spec</code>: <a class="autorefs autorefs-internal" title="spec_input_schema" href="#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema</code></a> less what the server answers.</p>
+        <p>What a caller is asked to send <code>spec</code>:
+<a class="autorefs autorefs-internal" title="spec_input_schema" href="#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema</code></a> less what
+the server answers.</p>
 <p><code>spec_input_schema</code> lists every parameter as declared, <code>required</code>
 meaning the call needs the value from someone. This is the schema a
 transport advertises, so <code>required</code> means the caller, and it requires
@@ -12504,7 +12550,8 @@ makes only under the handed <code>call_context</code> included
 
     <div class="doc doc-contents first">
 
-        <p>The JSON Schema of what <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> returns for <code>spec</code>.</p>
+        <p>The JSON Schema of what <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> returns
+for <code>spec</code>.</p>
 <p><code>None</code> when <code>spec.output()</code> is <code>None</code>: a spec with no presenter
 declares nothing about what it returns, and a shape invented for it would
 be a guess every client then trusts. A
@@ -12586,7 +12633,8 @@ paging envelope keep theirs. A spec declaring none is described with the
 
         <p>The JSON Schema object an argument set must satisfy, read from <code>parameters</code>.</p>
 <p>One dialect whichever library declared the parameters, because every
-adapter reads its library into <a class="autorefs autorefs-internal" title="Parameters
+adapter reads its library into
+<a class="autorefs autorefs-internal" title="Parameters
 
 
   
@@ -12602,7 +12650,8 @@ way to state on a string.</p>
   refuses when absent - a required parameter with no declared default,
   since one with a default is not refused - and left out when there are none.</li>
 <li><strong><code>"additionalProperties": false</code> is emitted under <code>REJECT</code> only</strong>, and
-  at exactly the levels <a class="autorefs autorefs-internal" title="check_arguments" href="#django_service_specs.parameters.check_arguments.check_arguments"><code>check_arguments</code></a>
+  at exactly the levels
+  <a class="autorefs autorefs-internal" title="check_arguments" href="#django_service_specs.parameters.check_arguments.check_arguments"><code>check_arguments</code></a>
   closes: the top, every object parameter that declares <code>fields</code>, and
   every row of an array whose <code>items</code> are Parameters - an empty
   declaration included, since it refuses every key. Under <code>IGNORE</code> an
@@ -13291,12 +13340,20 @@ and the shape check refuses one, as it does for every declaration: a
 caller sends the declared type. The empty choice is the other case: an
 optional choice field reads <code>""</code> as no value, and a caller sends
 <code>null</code> for that instead.</p>
-<p><strong>An argument is in its wire form, which no locale touches.</strong> A number
-field reads a string through the active locale when it is localized, and
-under one whose thousands separator is a dot that reads <code>"1.500"</code> as
-fifteen hundred. So a string argument for an <code>IntegerField</code>,
-<code>FloatField</code> or <code>DecimalField</code> is bound as the <code>Decimal</code> it spells,
-which the field reads as the number it is, localized or not.</p>
+<p><strong>The form is bound to a post.</strong> Its <code>data</code> is an immutable
+<code>QueryDict</code> holding each argument as the strings a browser would post
+for it, so a form or widget written for HTML reads it as it reads
+<code>request.POST</code>: <code>getlist</code> on a list, <code>.isdigit()</code> on an id. A list
+is one string per element, a boolean <code>"True"</code> or <code>"False"</code>, a date,
+time or datetime its ISO spelling, a duration Django's own, and <code>null</code>
+an absent key; any other value is its <code>str</code>. A file stays in <code>files</code>.</p>
+<p><strong>An argument is in its wire form, which no locale touches.</strong> A
+localized number field reads its post through the active locale, and
+under one whose thousands separator is a dot reads <code>"1.500"</code> as fifteen
+hundred. So a number, or a string spelling one, for a localized
+<code>IntegerField</code>, <code>FloatField</code> or <code>DecimalField</code> is posted as its
+widget renders it in that locale, which the field reads back as the
+number it is.</p>
 <p><strong>Declare the fields on the class.</strong> A field a form adds or changes in its
 own <code>__init__</code> is not in <code>base_fields</code>, so it is not described, and
 under <code>UnknownArguments.REJECT</code> the closed argument set refuses its key
@@ -13350,6 +13407,12 @@ helper that saves only what changed, such as
 <a class="autorefs autorefs-internal" title="update_from_input" href="#django_service_specs.mutations.update_from_input.update_from_input"><code>update_from_input</code></a>,
 would find nothing to save. Any other target - the queryset a collection
 selector resolves, or none - binds the form as a create.</p>
+<p><strong>A plain form that declares <code>instance</code> is handed the target.</strong> When a
+plain form's <code>__init__</code> names a parameter <code>instance</code> (a bare
+<code>**kwargs</code> does not count), the form is built with <code>instance=</code> the
+context's target itself, whatever it is and never a copy (a collection
+selector's queryset too), <code>None</code> when there is none; a plain
+form that declares none is built from <code>data</code> and <code>files</code> alone.</p>
 <p><strong>A form whose <code>__init__</code> takes more is handed it by <code>form_kwargs</code>.</strong>
 It is a callable returning a mapping of extra constructor keywords, such
 as a queryset scoped by the caller's tenant, and it binds through the
@@ -13430,7 +13493,7 @@ no field for: the closed argument set in front of it is what refuses one.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The form's class-level fields, in declaration order, as Parameters. Never queries.</p>
+        <p>The form's class-level fields, in declaration order, as Parameters.</p>
 
 
     </div>
@@ -13498,7 +13561,7 @@ binds it from, through the same code
 <a class="autorefs autorefs-internal" title="FormValidator" href="#django_service_specs.adapters.forms.form_validator.FormValidator"><code>FormValidator</code></a>
 calls it with, so the returned mapping is checked as there: one that is
 not a mapping, or that returns <code>data</code>, <code>files</code> or <code>instance</code>, which
-the bind sets itself, is refused with <code>ImproperlyConfigured</code>. Spread it
+only the bind may set, is refused with <code>ImproperlyConfigured</code>. Spread it
 beside those three: <code>form_class(data=..., **form_keywords(...))</code>.</p>
 <p>The pool holds:</p>
 <ul>
@@ -14025,7 +14088,8 @@ way it reached dispatch.</p>
    <a class="autorefs autorefs-internal" title="authorize_scope" href="#django_service_specs.dispatch.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
    where no row is: on a list, a collection target's set, empty or not,
    a create's <code>None</code>, and the <code>None</code> a service spec's instance
-   selector lets through under its <code>allow_none</code>. A selector spec's own <code>None</code> under <code>allow_none</code> is
+   selector lets through under its <code>allow_none</code>. A selector spec's own <code>None</code> under
+   <code>allow_none</code> is
    asked of neither.</li>
 <li>A service spec's Validator, on only the arguments it declares, with
    its <code>input_data</code> provider's values merged over the caller's, and the
@@ -14236,7 +14300,8 @@ selector, its <code>extend_queryset</code> or the service that has no
 default, that a caller could have filled and that nothing in the
 call's pool did - a read declared optional and not sent, a
 Validator parameter a call that is not <code>partial</code> left out -
-keyed by that parameter, and the same for a precondition's. One no caller can fill, or one the caller sent and the
+keyed by that parameter, and the same for a precondition's. One no caller can fill, or
+one the caller sent and the
 Validator did not hand back under that name, raises the
 callable's own <code>TypeError</code>.</p>
               </div>
@@ -14412,7 +14477,8 @@ the stages of each hop share it.</p>
 <p><code>seeds</code> is <code>dispatch</code>'s, handed on with the grant from <code>check_call</code>,
 <code>resolve_target</code> or <code>authorize</code> (after <code>resolve_seeds</code>) and taken
 on every route, and refused as <code>dispatch</code> refuses it, the wrong type or no
-<code>grant</code> on the loop before any hop. Like a grant, a carrier never covers a principal resolved here
+<code>grant</code> on the loop before any hop. Like a grant, a carrier never covers a principal resolved
+here
 from <code>principal_id</code>, which is not the object its prelude was handed, so
 such a call is a <code>TypeError</code> on the loop too, before any hop; pass the
 <code>principal</code> the prelude was handed.</p>
@@ -14831,7 +14897,8 @@ then <a class="autorefs autorefs-internal" title="envelope" href="#django_servic
 what comes back. The presenter's <code>presented_rows()</code> is then called once,
 with the page's rows and no others, so a lookup it batches over them
 costs the same whatever the size of the whole set. The envelope's keys
-belong to no <code>Output</code>, so the projection must never walk them. Whether to page is read off the spec,
+belong to no <code>Output</code>, so the projection must never walk them. Whether to page is read off the
+spec,
 never off the result's kind: a <code>LIST</code> selector spec, or a service spec
 whose output selector is a <code>LIST</code>, is paged, while a <code>many</code> or
 <code>returns_many</code> service spec's <code>kind="list"</code> is every row its service
@@ -15561,7 +15628,8 @@ different rows come back as one tree keyed by row index.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Refuse an <code>AdditionalInputRequired.schema</code> some route could not ask, or could not hear answered.</p>
+        <p>Refuse an <code>AdditionalInputRequired.schema</code> some route could not ask, or could not hear
+answered.</p>
 <p><code>schema</code> is what a service raised
 <a class="autorefs autorefs-internal" title="AdditionalInputRequired" href="#django_service_specs.services.additional_input_required.AdditionalInputRequired"><code>AdditionalInputRequired</code></a>
 with, read against <code>spec</code>: a transport calls this before it renders the
@@ -16034,7 +16102,8 @@ for every call reaching it. The second to fifth need that signature, so
 such a seat is answered by this refusal alone, and the other seats are
 still checked.</p>
 <p>A Validator field the service never receives is not among them, because
-such a spec runs and may mean to: <a class="autorefs autorefs-internal" title="unreceived_fields" href="#django_service_specs.dispatch.unreceived_fields.unreceived_fields"><code>unreceived_fields</code></a>
+such a spec runs and may mean to:
+<a class="autorefs autorefs-internal" title="unreceived_fields" href="#django_service_specs.dispatch.unreceived_fields.unreceived_fields"><code>unreceived_fields</code></a>
 answers it, and the transport decides.</p>
 <p><strong>What it cannot see, and so never refuses.</strong> A provider whose return says
 nothing about its keys may fill any keyword of the callable it provides
@@ -16050,7 +16119,8 @@ either (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
 handing <code>dispatch</code> an <code>extra_kwargs</code> overlay fills keywords this cannot
 see, and should not call it for such a spec. Only the fifth refusal is not
 run on a precondition, a condition, the output selector, an
-<code>extend_queryset</code>, a provider or a <code>progress_reporter</code>. A precondition beside a Validator, or one or an
+<code>extend_queryset</code>, a provider or a <code>progress_reporter</code>. A precondition beside a Validator,
+or one or an
 <code>extend_queryset</code> beside an untyped provider, is left to dispatch by the
 third and fourth as the callable beside it is, never by the second. A
 callable taking <code>**kwargs</code> requires nothing, so one forwarding into a
@@ -16124,7 +16194,8 @@ signature cannot be read, every one found.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Of <code>spec</code>'s parameters named like a seed <code>pool_seeds</code> registers or the call's own: those filled, and those refused.</p>
+        <p>Of <code>spec</code>'s parameters named like a seed <code>pool_seeds</code> registers or the call's own: those
+filled, and those refused.</p>
 <p>The answer <code>dispatch</code> gives before it reads a call's arguments, read
 alone, so a transport can give it when it registers the spec rather than
 on every call. A parameter shares a name when a seed <code>pool_seeds</code>
@@ -16179,7 +16250,8 @@ it compiles to.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Every top-level parameter of <code>spec</code> a provider fills or may fill: what the shape check relaxes.</p>
+        <p>Every top-level parameter of <code>spec</code> a provider fills or may fill: what the shape check
+relaxes.</p>
 <p>Each provider's values reach one seat, and relax the parameters there: a
 <code>kwargs</code> provider its spec's <code>reads</code>, a service spec's target
 selector's <code>kwargs</code> that selector's <code>reads</code>, and, on a service spec
@@ -16243,7 +16315,8 @@ it compiles to.</p>
 
     <div class="doc doc-contents first">
 
-        <p>The Validator fields of <code>spec</code> its service takes neither by name, nor through <code>data</code>, nor through <code>**kwargs</code>.</p>
+        <p>The Validator fields of <code>spec</code> its service takes neither by name, nor through <code>data</code>, nor
+through <code>**kwargs</code>.</p>
 <p>A value a caller sends for one is validated and then reaches the service
 by no route, on a mount registering <code>pool_seeds</code>. A top-level field
 named like a registered seed or the call's <code>request</code> or <code>view</code>
@@ -16304,7 +16377,8 @@ have no fields, and are answered with none.</p>
 
   
       dataclass
-  " href="#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a> that cannot mean what it says for <code>spec</code>.</p>
+  " href="#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>
+that cannot mean what it says for <code>spec</code>.</p>
 <p>For a transport to call once, when it is built, with the <code>pool_seeds</code> it
 dispatches with, so a binding that would do nothing or break every call
 fails at startup rather than on the first call that reaches it. Pure and
@@ -16443,7 +16517,8 @@ handed that call's dict, checks the value against what the call declares.</p>
 
     <div class="doc doc-contents first">
 
-        <p><code>arguments</code> as dispatch should receive them under <code>server</code>: a new dict, the input untouched.</p>
+        <p><code>arguments</code> as dispatch should receive them under <code>server</code>: a new dict, the input
+untouched.</p>
 <p>For a transport to call on every call, before
 <a class="autorefs autorefs-internal" title="dispatch" href="#django_service_specs.dispatch.dispatch.dispatch"><code>dispatch</code></a> or
 <a class="autorefs autorefs-internal" title="adispatch
@@ -16473,7 +16548,8 @@ refused under <code>REJECT</code>.</p>
 <p>The bound values are checked against their own parameters, as
 <code>check_server_arguments</code> checked them when the transport was built, and
 handed on as the shape check reads them: a <code>uuid</code> in its canonical
-spelling, an integral float declared an integer as the int. <strong>One that fails is the server's mistake</strong>,
+spelling, an integral float declared an integer as the int. <strong>One that fails is the server's
+mistake</strong>,
 raised as <code>ImproperlyConfigured</code> with the refusal as its cause, never
 as <code>InvalidArguments</code>: a client refusal would ask the caller to fix a
 value it neither sent nor can see. This is where the rule parts from
@@ -16672,7 +16748,8 @@ expression.</p>
 
     <div class="doc doc-contents first">
 
-        <p><code>parameters</code> as a call of <code>spec</code> is checked under <code>partial</code>: every Validator parameter optional.</p>
+        <p><code>parameters</code> as a call of <code>spec</code> is checked under <code>partial</code>: every Validator parameter
+optional.</p>
 <p>The one reading of what a partial call may leave out, for the shape check
 and for <code>spec_input_schema</code>'s <code>required</code>, so the schema never asks for
 a field dispatch would not refuse absent, nor leaves one out that it
@@ -16922,6 +16999,9 @@ that names it and never to one taking <code>**kwargs</code> for the rest: the di
 passed, else the one <code>pool</code> carries, else a fresh one the conditions of
 this call share. A <code>call_context</code> passed beside a different one in
 <code>pool</code> raises <code>ImproperlyConfigured</code> (<code>with_call_context</code>).</p>
+<p>A lazy <code>reason</code> is answered as text in the language active at the call,
+on a copy of the declared affordance; one declared as text is returned as
+declared.</p>
 
 
     </div>
@@ -16987,7 +17067,9 @@ disagree about which conditions there are.</p>
 
     <div class="doc doc-contents first">
 
-        <p><a class="autorefs autorefs-internal" title="enforce_affordances" href="#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a> for an async caller.</p>
+        <p>Same as
+<a class="autorefs autorefs-internal" title="enforce_affordances" href="#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>,
+for an async caller.</p>
 <p>For a transport that runs a service without
 <a class="autorefs autorefs-internal" title="adispatch
 
@@ -17091,7 +17173,9 @@ function's <code>TypeError</code> whatever it declares.</p>
 
     <div class="doc doc-contents first">
 
-        <p><a class="autorefs autorefs-internal" title="unmet_operation_affordance" href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance"><code>unmet_operation_affordance</code></a> for an async caller.</p>
+        <p>Same as
+<a class="autorefs autorefs-internal" title="unmet_operation_affordance" href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance"><code>unmet_operation_affordance</code></a>,
+for an async caller.</p>
 <p>For a transport building its list of operations on an event loop: an MCP
 server answering a tool list, an agent assembling its next step's tools.
 It gives the sync function's answer for the same arguments, and <code>reserved=</code>
@@ -17146,6 +17230,10 @@ row does not meet, in declaration order, as the call would refuse. A
 exists: <code>{"available": False}</code> with no code and no reason, and the walk
 stops there. It is the same reading <code>present</code> and <code>with_affordances</code>
 make of a row, because they call the same function.</p>
+<p>A row that wraps its model instance is read through the presenting
+selector's <code>row_object</code>, as dispatch answered it; a row whose
+<code>row_object</code> is <code>None</code> answers <code>{"available": False}</code> for every name
+with a condition, there being no object to have met it.</p>
 <p>A spec that presents no affordances answers <code>{}</code>, as <code>present</code> leaves
 the <code>affordances</code> key out of what it presents. A caller asking about a name
 the answer does not hold must treat it as not declared; the answer cannot
@@ -17245,7 +17333,8 @@ opt-in, so a DRF-style <code>has_permission(self, request, spec)</code> under a
 transport registering a <code>request</code> seed is asked as before. A seed named
 <code>arguments</code> is never handed this way: <code>arguments</code> is always the
 call's arguments.</p>
-<p><code>message</code> is what <a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
+<p><code>message</code> is what
+<a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
 says when this check refuses; <code>None</code> keeps the generic wording.</p>
 <p><strong>Sync-only</strong>, like every concept: a check may query, so the async path runs
 it in the executor. An <code>async def</code> method would answer with a coroutine,
@@ -17372,7 +17461,8 @@ for a call that acts on no existing row.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Normalize <code>permissions</code> to a tuple, refusing anything that is not a check <em>instance</em>, and an empty one.</p>
+        <p>Normalize <code>permissions</code> to a tuple, refusing anything that is not a check <em>instance</em>, and
+an empty one.</p>
 <p>Called by <code>ServiceSpec</code> and <code>SelectorSpec</code> on their <code>permissions=</code>,
 and by a transport that accepts <code>PermissionCheck</code>s on something other
 than a spec - a prompt, a view - so that it normalizes and refuses them by
@@ -17590,7 +17680,8 @@ the generic wording.</p>
 
 
 
-        <p>Passes when none of its checks passes <code>has_permission</code>: <code>NoneOf(IsSuspended(), message=...)</code>.</p>
+        <p>Passes when none of its checks passes <code>has_permission</code>: <code>NoneOf(IsSuspended(),
+message=...)</code>.</p>
 <p>It inverts the class-level question alone, asking each check in order
 and refusing at the first that passes; its row and scope questions allow,
 as a <code>PermissionCheck</code>'s do by default. So a check judging rows or a
@@ -17851,7 +17942,9 @@ call handed no <code>call_context</code> (<code>None</code>) is covered by none.
 
     <div class="doc doc-contents ">
 
-        <p>These values, for a call they <a class="autorefs autorefs-internal" title="covers" href="#django_service_specs.dispatch.call_seeds.CallSeeds.covers"><code>cover</code></a>; <code>NotPermitted</code> otherwise.</p>
+        <p>These values, for a call they
+<a class="autorefs autorefs-internal" title="covers" href="#django_service_specs.dispatch.call_seeds.CallSeeds.covers"><code>cover</code></a>; <code>NotPermitted</code>
+otherwise.</p>
 <p>The one place a carrier for another spec, principal, call context or
 registry is refused, for every function that takes one: <code>dispatch</code>
 and <code>adispatch</code>, <code>resolve_target</code>, and the three <code>authorize</code>
@@ -17936,7 +18029,8 @@ so with <code>permissions=[Unrestricted()]</code>.</p>
 <p>Otherwise every check's <code>has_permission</code> must pass, in order; the first
 refusal raises
 <a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
-a <code>NotPermitted</code> naming the check and the spec, with that check's own message, or the generic one when it declares none.
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message, or the generic
+one when it declares none.
 An answer still to be awaited - a coroutine from a check that is not
 sync - raises <code>ImproperlyConfigured</code> rather than being read as a pass.</p>
 <p><code>arguments</code> is handed to each check's method that declares a keyword
@@ -18072,7 +18166,8 @@ for a call that resolves no single row: <code>scope</code> is the resolved set o
 bulk or collection call, or <code>None</code> for a create. Every check's
 <code>has_scope_permission</code> must pass, in order, and the first refusal raises
 <a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
-a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still to be awaited raises
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still
+to be awaited raises
 <code>ImproperlyConfigured</code> rather than being read as a pass. A
 <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> is
 checked as the spec it compiles to.</p>
@@ -18153,7 +18248,8 @@ before <code>grant.target_checked</code> can answer and before any check is aske
 
     <div class="doc doc-contents first">
 
-        <p>Whether one of <code>spec</code>'s permission checks declares <code>arguments</code> on a question asked before any row is resolved.</p>
+        <p>Whether one of <code>spec</code>'s permission checks declares <code>arguments</code> on a question asked before
+any row is resolved.</p>
 <p>A transport that lists the operations a principal may run has no
 arguments to hand a check, and one that declares <code>arguments</code> is written
 to be given them. This answers, without calling any check, whether one
@@ -18351,7 +18447,8 @@ handed in as <code>target=</code>, and never on a selector spec's row (see
 <code>Grant</code>); otherwise every check's <code>has_object_permission</code> must pass,
 in order, and the first refusal raises
 <a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
-a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still to be awaited raises
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still
+to be awaited raises
 <code>ImproperlyConfigured</code> rather than being read as a pass. A
 <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> is
 checked as the spec it compiles to.</p>
@@ -19719,8 +19816,8 @@ a <code>kwargs</code> or <code>input_data</code> provider, a selector and its
 <code>extend_queryset</code>, an affordance condition,
 a precondition, the service, the run's <code>progress_reporter</code> - receives as
 the same object by naming it, and never through <code>**kwargs</code>. Never a copy,
-and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
-call adds. <code>shapes</code> is what the caller sent for the spec's declared
+and the kernel writes nothing to it. Seed resolvers do not see it: a seed resolves before
+anything the call adds. <code>shapes</code> is what the caller sent for the spec's declared
 <code>shapes</code>, keyed by shape name and read-only: the mapping
 <code>PresentationContext.shapes</code> holds, so a selector that eager-loads by the
 query its presenter renders reads the value the presenter reads. It is in
@@ -19740,8 +19837,8 @@ row services', and like it, not in a seed resolver's or a <code>filter_set</code
 test_a_seed_resolver_naming_the_shapes_is_handed_none,
 test_a_filter_naming_the_shapes_is_handed_none; a helper's row services
 are handed its <code>**kwargs</code>, which
-test_a_catch_all_is_never_handed_the_shapes keeps free of the seed). The seven besides those two are the names
-<code>djangorestframework-services</code> seeds for the same values, so a callable
+test_a_catch_all_is_never_handed_the_shapes keeps free of the seed). The seven besides those two
+are the names <code>djangorestframework-services</code> seeds for the same values, so a callable
 written for it runs under this kernel unchanged.</p>
 <p><code>progress</code> is in every pool, and live only where there is work to report on:
 a service's run, and a selector spec's own selector. In a target or output
@@ -19921,7 +20018,8 @@ is genuinely per-call; register one that is ambient.</p>
 
     <div class="doc doc-contents first">
 
-        <p>The seeds of <a class="autorefs autorefs-internal" title="base_pool" href="#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a>, resolved under a call's context.</p>
+        <p>The seeds of <a class="autorefs autorefs-internal" title="base_pool" href="#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a>, resolved under a
+call's context.</p>
 <p><strong>A transport with a call context builds its pool here</strong>, rather than
 spreading its own <code>request</code> beside a registered seed: <code>base_pool</code> refuses
 that pair, and it should, since a seed cannot silently outrank what the caller
@@ -19988,7 +20086,8 @@ forward it; refusing the call is not.</p>
 
     <div class="doc doc-contents first">
 
-        <p>One <a class="autorefs autorefs-internal" title="ProgressReporter" href="#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a> forwarding to all of <code>reporters</code>.</p>
+        <p>One <a class="autorefs autorefs-internal" title="ProgressReporter" href="#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a>
+forwarding to all of <code>reporters</code>.</p>
 <p>For a transport with more than one sink of its own to hand dispatch's
 <code>progress=</code>: the channel back to its client - MCP notifications, a
 websocket - beside a task record, an audit trail or metrics. Neither
@@ -20349,7 +20448,8 @@ parameters present in the signature are forwarded.</p>
         <p>Build, <code>save()</code>, and return a fresh instance of <code>model</code>.</p>
 <p>Regular fields come from <code>data</code> (a dataclass, dict, or object with <code>__dict__</code>).</p>
 <p>A file field is written as a <code>ModelForm</code> writes it, through the model
-field's <code>save_form_data</code>: a file is stored, <code>None</code> leaves the field to the model, and <code>False</code>,
+field's <code>save_form_data</code>: a file is stored, <code>None</code> leaves the field to the model, and
+<code>False</code>,
 a form's value for a cleared file, stores no file.</p>
 <p><code>m2m</code> maps a many-to-many attribute to the rows it should hold — instances or
 primary keys of rows that <strong>already exist</strong> — and <code>set()</code>s them after the save;
@@ -20456,7 +20556,8 @@ setting the image wrote on the instance. Pass <code>False</code> to
 perform a full save, or an explicit list to control exactly which columns
 are written (no auto-injection in that case).</p>
 <p>A file field is written as a <code>ModelForm</code> writes it, through the model
-field's <code>save_form_data</code>: a file replaces the one the row holds, <code>None</code> keeps it, and <code>False</code>,
+field's <code>save_form_data</code>: a file replaces the one the row holds, <code>None</code> keeps it, and
+<code>False</code>,
 a form's value for a cleared file, leaves no file, reported as a change to <code>""</code>.
 An upload, or any <code>File</code> that is not one a row holds, is always written and reported,
 even under the name of the file it replaces, since a name says nothing of the content;
@@ -20624,7 +20725,8 @@ and the rows it merely points at are not.</strong></p>
       dataclass
   " href="#django_service_specs.relations.many_to_many_spec.ManyToManySpec"><code>ManyToManySpec</code></a>
   loses its membership, and its target rows survive.</li>
-<li>A <a class="autorefs autorefs-internal" title="ForwardRelationSpec
+<li>A
+  <a class="autorefs autorefs-internal" title="ForwardRelationSpec
 
 
   
@@ -20674,7 +20776,8 @@ every row service the specs declare; this helper never reads it.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Async variant of <a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>.</p>
+        <p>Async variant of
+<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>.</p>
 <p>The same rule, the same order and the same report, through Django's async
 ORM. A row service a spec declares must be <code>async def</code> here, as in every
 async helper: one the loop cannot await is refused, naming its slot.</p>
@@ -21536,7 +21639,8 @@ the pool.</p>
 
     <div class="doc doc-contents first">
 
-        <p>The async twin of <a class="autorefs autorefs-internal" title="delete_collection" href="#django_service_specs.mutations.delete_collection.delete_collection"><code>delete_collection</code></a>.</p>
+        <p>The async twin of
+<a class="autorefs autorefs-internal" title="delete_collection" href="#django_service_specs.mutations.delete_collection.delete_collection"><code>delete_collection</code></a>.</p>
 <p>Deletes with <code>await collection.adelete()</code>. <code>soft_delete</code> is an
 <code>async def</code> called with the <code>collection</code> in its place.</p>
 
@@ -21766,7 +21870,9 @@ the spec changing. <code>"unlink"</code> against a non-nullable FK raises
 <code>ImproperlyConfigured</code> when the
 relation is written, since there is no link to blank. The same rule
 governs the delete cascade
-(<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>), which disposes of the same rows.</p>
+(
+<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>),
+which disposes of the same rows.</p>
               </div>
             </td>
           </tr>
@@ -21778,7 +21884,8 @@ governs the delete cascade
             <td>
               <div class="doc-md-description">
                 <p>Forwarded to the per-child <code>create_from_input</code> /
-<code>update_from_input</code> call, exactly as for the parent. It shapes that <strong>write</strong> and nothing else: matching, the
+<code>update_from_input</code> call, exactly as for the parent. It shapes that <strong>write</strong> and
+nothing else: matching, the
 primary-key guard and the parent link all read the row exactly as
 it arrived, so renaming a key here does not change which row the
 payload matches.</p>
@@ -21792,7 +21899,8 @@ payload matches.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Forwarded to the per-child call, as <code>field_map</code> is. Excluding the <code>match_key</code> does not stop the row
+                <p>Forwarded to the per-child call, as <code>field_map</code> is. Excluding the
+<code>match_key</code> does not stop the row
 matching on it, and a matched row's primary key is dropped from
 the write for you, so there is no need to name it here.</p>
               </div>
@@ -21869,8 +21977,9 @@ convention.</p>
                 <p>Called as
 <code>delete_service(*, instance, parent, **extras)</code>, replacing the
 unlink-or-delete rule for that row — both for orphan removal and
-for the delete cascade (<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>). The
-loop can no longer tell an unlink from a delete, so the pk is
+for the delete cascade
+(<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>).
+The loop can no longer tell an unlink from a delete, so the pk is
 reported under
 <code>ChildCollectionChange.removed</code>
 rather than guessed into one of the two. It <em>is</em> the disposal, so
@@ -22042,7 +22151,8 @@ may write any row of that model by guessing a key".</p>
             <td>
               <div class="doc-md-description">
                 <p>Forwarded to the target row's own <code>create_from_input</code> /
-<code>update_from_input</code> call, exactly as for the parent. It shapes that <strong>write</strong> and nothing else: matching and the primary-key
+<code>update_from_input</code> call, exactly as for the parent. It shapes that <strong>write</strong> and
+nothing else: matching and the primary-key
 guard both read the row exactly as
 it arrived, so renaming a key here does not change which row the
 payload matches.</p>
@@ -22247,14 +22357,16 @@ field whose nullability decides unlink-versus-delete by default.</p>
 
   
       dataclass
-  " href="#django_service_specs.relations.child_spec.ChildSpec"><code>ChildSpec</code></a>'s rule: <code>"auto"</code> (the
+  " href="#django_service_specs.relations.child_spec.ChildSpec"><code>ChildSpec</code></a>'s rule: <code>"auto"</code>
+(the
 default) derives it from <code>fk</code> — <strong>unlinked</strong> when that field is
 nullable (like <code>on_delete=SET_NULL</code>), <strong>deleted</strong> when it is not
 (like <code>CASCADE</code>) — while <code>"unlink"</code> / <code>"delete"</code> state it
 instead, and <code>"unlink"</code> against a non-nullable <code>fk</code> raises
 <code>ImproperlyConfigured</code> at write time.
 It covers both removals there are: the <code>None</code> case above and the
-delete cascade (<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>).</p>
+delete cascade
+(<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>).</p>
               </div>
             </td>
           </tr>
@@ -22320,7 +22432,8 @@ the contract <a class="autorefs autorefs-internal" title="ChildSpec
 
   
       dataclass
-  " href="#django_service_specs.relations.child_spec.ChildSpec"><code>ChildSpec</code></a> states: it
+  " href="#django_service_specs.relations.child_spec.ChildSpec"><code>ChildSpec</code></a> states:
+it
 receives <code>parent</code>, and its <code>data</code> already carries the <code>fk</code>.
 Declaring it alongside the row-shaping fields above raises at
 construction.</p>
@@ -22485,8 +22598,8 @@ on it — that combination raises at construction, on the terms
 
   
       dataclass
-  " href="#django_service_specs.relations.forward_relation_spec.ForwardRelationSpec"><code>ForwardRelationSpec</code></a> states:
-without it the spec is create-only, and a payload carrying a
+  " href="#django_service_specs.relations.forward_relation_spec.ForwardRelationSpec"><code>ForwardRelationSpec</code></a>
+states: without it the spec is create-only, and a payload carrying a
 <code>match_key</code> raises
 <code>ImproperlyConfigured</code>. Matching runs
 against <code>scope</code>, not against the parent's current membership — the
@@ -22725,7 +22838,8 @@ them when the model spells the columns differently.</p>
             <td>
               <div class="doc-md-description">
                 <p>The field pairing an incoming row with an existing one
-(default <code>"pk"</code>), read inside the parent's own accessor. Read off the incoming row as an input key
+(default <code>"pk"</code>), read inside the parent's own accessor. Read off the incoming row as
+an input key
 and off the lookup as a model field, so <code>field_map</code> may not
 rename anything onto the primary key while <code>match_key</code> matches
 on it — that combination raises at construction, on the terms
@@ -22770,7 +22884,8 @@ state the relation has a meaning for. <code>"auto"</code> (the default)
 and <strong>deletes</strong> otherwise; <code>"unlink"</code> and <code>"delete"</code> state it
 instead of deriving it, and <code>"unlink"</code> raises at write time unless
 both columns can hold <code>NULL</code>. The rule also governs the
-delete cascade (<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>).</p>
+delete cascade
+(<a class="autorefs autorefs-internal" title="delete_relations" href="#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations</code></a>).</p>
               </div>
             </td>
           </tr>
@@ -24510,7 +24625,7 @@ reworded. What a transport or a client branches on.</p>
           <tr class="doc-section-item">
             <td><code><span title="django_service_specs.types.affordance.Affordance.reason">reason</span></code></td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="str">str</span> | <span title="django.utils.functional.Promise">Promise</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -24518,7 +24633,10 @@ reworded. What a transport or a client branches on.</p>
 answer, and as the message of the <code>ActionUnavailable</code> a refused
 call raises. Write it for them: say what is not possible and, where
 it helps, what would make it possible, and keep internal state out
-of it, since every reader of the operation reads it.</p>
+of it, since every reader of the operation reads it. A lazy string
+(<code>gettext_lazy</code>) is accepted and kept unevaluated: the kernel
+resolves it in the language active where it hands an answer out, so
+every reason a caller receives is a <code>str</code>.</p>
               </div>
             </td>
           </tr>
@@ -24552,7 +24670,9 @@ of it, since every reader of the operation reads it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>code</code> or <code>reason</code> is not a non-empty string;
+                <p><code>code</code> is not a non-empty string, or <code>reason</code>
+is neither a non-empty string nor a lazy one (a lazy reason that
+resolves empty is refused where it is handed out);
 <code>when</code> is an ORM expression that is not boolean; <code>when</code> is a
 callable naming <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code>
 or <code>queryset</code>; <code>when</code> is an async callable - an <code>async
@@ -24843,7 +24963,8 @@ built, because the check runs once and the binding is applied on every
 call after: a key added later, to the mapping a caller passed in or to the
 binding's own, would reach the call unchecked. It still copies and pickles
 like any other value a transport holds, rebuilt through the constructor.
-It takes no part in the hash, as <code>Parameter.default</code> does not, so a binding is hashable whatever its values are while equality
+It takes no part in the hash, as <code>Parameter.default</code> does not, so a binding is hashable
+whatever its values are while equality
 still compares them. <code>withheld</code> is held as a <code>frozenset</code>, a <code>set</code>
 included, and a bare <code>str</code> is refused, since <code>frozenset("pk")</code> is a set
 of characters rather than one name.</p>
@@ -25329,7 +25450,8 @@ same reason an unrecognised choice value does: a stale or oddly-typed
 row should still be reported rather than fail the call. So is a string
 shaped like a date-time that names no real moment, the thirtieth of
 February say, which Django's parser refuses with a <code>ValueError</code>: paging
-would otherwise turn one row's bad data into a failed page. Declaring this on a field that never carries a date is a
+would otherwise turn one row's bad data into a failed page. Declaring this on a field that
+never carries a date is a
 misdeclaration nothing here can detect.</p>
 
 
