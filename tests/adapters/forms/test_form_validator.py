@@ -2556,3 +2556,326 @@ class TestAPrefixedForm:
 
         assert uploaded["attachment"] is upload
         assert cleared["attachment"] is False
+
+
+class _Line(forms.Form):
+    title = forms.CharField()
+    count = forms.IntegerField(required=False, initial=1)
+
+
+class _Lines(forms.BaseFormSet):
+    def clean(self) -> None:
+        titles = [form.cleaned_data.get("title") for form in self.forms]
+        if len(titles) != len(set(titles)):
+            raise ValidationError("Each title once.", code="repeated")
+
+
+_LineSet = forms.formset_factory(_Line, formset=_Lines)
+_DeletableLineSet = forms.formset_factory(_Line, can_delete=True)
+_EditionSet = forms.modelformset_factory(Edition, fields=("book", "number"), can_delete=True)
+_BookSet = forms.modelformset_factory(Book, fields=("title", "price", "author"))
+
+
+def _many(
+    validator: FormValidator, rows: list[dict[str, Any]], context: ValidationContext = CONTEXT
+) -> Any:
+    return validator.validated_many(dict(enumerate(rows)), context, many_argument="items")
+
+
+def _many_refusal(
+    validator: FormValidator, rows: Mapping[int, dict[str, Any]], context: ValidationContext
+) -> Any:
+    with pytest.raises(InvalidArguments) as caught:
+        validator.validated_many(rows, context, many_argument="items")
+    return caught.value.detail
+
+
+_NOT_A_CHOICE = "Select a valid choice. That choice is not one of the available choices."
+
+
+def _collection(queryset: QuerySet[Any]) -> ValidationContext:
+    return ValidationContext(None, queryset, resolved={"collection": queryset})
+
+
+class TestAFormsetConstruction:
+    def test_a_formset_class_is_kept(self) -> None:
+        assert FormValidator(_Line, formset_class=_LineSet).formset_class is _LineSet
+        assert FormValidator(_Line).formset_class is None
+
+    def test_anything_but_a_formset_class_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="takes a Django formset class"):
+            FormValidator(_Line, formset_class=_Line)  # ty: ignore[invalid-argument-type]
+
+    def test_a_formset_over_another_form_is_refused(self) -> None:
+        with pytest.raises(
+            ImproperlyConfigured, match=r"_LineFormSet\.form is _Line, not _Profile"
+        ):
+            FormValidator(_Profile, formset_class=_LineSet)
+
+    def test_an_inline_formset_is_refused(self) -> None:
+        inline = forms.inlineformset_factory(Book, Edition, fields=("number",))
+        with pytest.raises(ImproperlyConfigured, match="an inline formset"):
+            FormValidator(inline.form, formset_class=inline)
+
+    def test_a_formset_that_orders_is_refused(self) -> None:
+        ordered = forms.formset_factory(_Line, can_order=True)
+        with pytest.raises(ImproperlyConfigured, match="can_order"):
+            FormValidator(_Line, formset_class=ordered)
+
+    def test_a_field_named_as_a_field_the_formset_adds_is_refused(self) -> None:
+        class Deleting(forms.Form):
+            DELETE = forms.CharField()
+
+        deletable = forms.formset_factory(Deleting, can_delete=True)
+        with pytest.raises(ImproperlyConfigured, match="'DELETE'"):
+            FormValidator(Deleting, formset_class=deletable)
+        keyed = forms.modelformset_factory(Book, fields=("title",))
+
+        class Keyed(keyed.form):  # ty: ignore[unsupported-base]
+            id = forms.IntegerField()
+
+        keyed_set = forms.modelformset_factory(Book, form=Keyed)
+        with pytest.raises(ImproperlyConfigured, match="'id'"):
+            FormValidator(keyed_set.form, formset_class=keyed_set)
+
+    def test_a_formset_takes_no_partial_call(self) -> None:
+        assert FormValidator(_Line).supports_partial is True
+        validator = FormValidator(_Line, formset_class=_LineSet)
+        assert validator.supports_partial is False
+        with pytest.raises(ImproperlyConfigured, match="partial"):
+            _many(validator, [{"title": "a"}], ValidationContext(None, partial=True))
+        with pytest.raises(ImproperlyConfigured, match="partial=True"):
+            ServiceSpec(
+                service=lambda **kwargs: None,
+                permissions=[Unrestricted()],
+                many=True,
+                partial=True,
+                validator=validator,
+            )
+
+
+class TestAFormsetParameters:
+    def test_a_plain_formset_adds_nothing(self) -> None:
+        names = [p.name for p in FormValidator(_Line, formset_class=_LineSet).parameters()]
+        assert names == ["title", "count"]
+
+    def test_can_delete_declares_the_marker(self) -> None:
+        declared = FormValidator(_Line, formset_class=_DeletableLineSet).parameters()
+        assert [p.name for p in declared] == ["title", "count", "DELETE"]
+        assert declared.get("DELETE") == Parameter("DELETE", "boolean")
+
+    def test_a_model_formset_declares_the_key_then_the_marker(self) -> None:
+        declared = FormValidator(_EditionSet.form, formset_class=_EditionSet).parameters()
+        assert [p.name for p in declared] == ["book", "number", "id", "DELETE"]
+        assert declared.get("id") == Parameter("id", "integer", required=False, nullable=True)
+        assert [p.name for p in FormValidator(_BookSet.form, formset_class=_BookSet).parameters()][
+            -1
+        ] == "id"
+
+
+class TestAFormset:
+    def test_without_a_formset_class_each_row_is_its_own_form(self) -> None:
+        # Two equal titles pass: only a formset's clean() sees the set.
+        validated = _many(FormValidator(_Line), [{"title": "a"}, {"title": "a"}])
+        assert validated.values == {"items": [{"title": "a", "count": None}] * 2}
+        assert validated.pool == {}
+
+    def test_every_row_is_bound_into_one_formset_put_in_the_pool(self) -> None:
+        validated = _many(
+            FormValidator(_Line, formset_class=_LineSet), [{"title": "a"}, {"title": "b"}]
+        )
+        rows = [{"title": "a", "count": None}, {"title": "b", "count": None}]
+        assert validated.values == {"items": rows}
+        assert validated.data == rows
+        formset = validated.pool["formset"]
+        assert isinstance(formset, _LineSet)
+        assert formset.data.getlist("form-1-title") == ["b"]
+
+    def test_the_formsets_clean_answers_as_the_lists_non_field_errors(self) -> None:
+        validator = FormValidator(_Line, formset_class=_LineSet)
+        detail = _many_refusal(validator, {0: {"title": "a"}, 1: {"title": "a"}}, CONTEXT)
+        assert coded(detail) == {"non_field_errors": [("Each title once.", "repeated")]}
+
+    def test_a_row_refusal_keeps_the_callers_index(self) -> None:
+        validator = FormValidator(_Line, formset_class=_LineSet)
+        detail = _many_refusal(validator, {2: {"title": "a"}, 5: {"count": "x"}}, CONTEXT)
+        assert detail == {5: {"title": [REQUIRED], "count": ["Enter a whole number."]}}
+
+    def test_a_row_equal_to_the_initials_is_still_validated(self) -> None:
+        validator = FormValidator(_Line, formset_class=_LineSet)
+        assert _many_refusal(validator, {0: {"count": 1}}, CONTEXT) == {0: {"title": [REQUIRED]}}
+
+    def test_a_deleted_row_is_not_validated_and_keeps_its_marker(self) -> None:
+        validator = FormValidator(_Line, formset_class=_DeletableLineSet)
+        validated = _many(validator, [{"title": "a"}, {"count": "x", "DELETE": True}])
+        assert validated.values["items"] == [
+            {"title": "a", "count": None, "DELETE": False},
+            {"DELETE": True},
+        ]
+
+    def test_form_kwargs_is_called_once_for_the_set(self) -> None:
+        calls: list[None] = []
+
+        def kwargs() -> dict[str, Any]:
+            calls.append(None)
+            return {"label_suffix": ";"}
+
+        validator = FormValidator(_Line, form_kwargs=kwargs, formset_class=_LineSet)
+        formset = _many(validator, [{"title": "a"}, {"title": "b"}]).pool["formset"]
+        assert calls == [None]
+        assert [form.label_suffix for form in formset.forms] == [";", ";"]
+
+    def test_form_kwargs_returning_a_prefix_is_refused(self) -> None:
+        validator = FormValidator(
+            _Line, form_kwargs=lambda: {"prefix": "p"}, formset_class=_LineSet
+        )
+        with pytest.raises(ImproperlyConfigured, match="'prefix'"):
+            _many(validator, [{"title": "a"}])
+
+    def test_a_formsets_own_prefix_spells_the_rows(self) -> None:
+        class Prefixed(_Lines):
+            @classmethod
+            def get_default_prefix(cls) -> str:
+                return "line"
+
+        prefixed = forms.formset_factory(_Line, formset=Prefixed)
+        formset = _many(FormValidator(_Line, formset_class=prefixed), [{"title": "a"}]).pool[
+            "formset"
+        ]
+        assert formset.data.getlist("line-0-title") == ["a"]
+
+    def test_a_file_and_its_clear_checkbox_are_keyed_per_row(self) -> None:
+        uploads = forms.formset_factory(_DocumentForm)
+        upload = SimpleUploadedFile("scan.txt", b"x")
+        validated = _many(
+            FormValidator(_DocumentForm, formset_class=uploads),
+            [{"title": "t", "scan": upload, "attachment-clear": True}],
+        )
+        assert validated.values["items"][0]["scan"] is upload
+        assert validated.values["items"][0]["attachment"] is False
+        assert validated.pool["formset"].files.getlist("form-0-scan") == [upload]
+
+    def test_a_too_long_set_is_refused_by_the_formset(self) -> None:
+        capped = forms.formset_factory(_Line, max_num=1, validate_max=True)
+        detail = _many_refusal(
+            FormValidator(_Line, formset_class=capped),
+            {0: {"title": "a"}, 1: {"title": "b"}},
+            CONTEXT,
+        )
+        assert coded(detail) == {
+            "non_field_errors": [("Please submit at most 1 form.", "too_many_forms")]
+        }
+
+    def test_a_formset_refusal_reaches_the_caller_through_dispatch(self) -> None:
+        spec = ServiceSpec(
+            service=lambda items: items,
+            permissions=[Unrestricted()],
+            many=True,
+            validator=FormValidator(_Line, formset_class=_LineSet),
+        )
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(spec, principal=None, arguments={"items": [{"title": "a"}, {"title": "a"}]})
+        assert caught.value.detail == {"items": {"non_field_errors": ["Each title once."]}}
+
+
+@pytest.mark.django_db
+class TestAModelFormset:
+    @pytest.fixture
+    def book(self) -> Book:
+        author = Author.objects.create(name="Ada")
+        return Book.objects.create(author=author, title="Notes", price=Decimal("9.99"))
+
+    def test_a_model_formset_needs_a_collection_target(self, book: Book) -> None:
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        for target in (None, book, Book.objects.all()):
+            with pytest.raises(ImproperlyConfigured, match="collection of Edition rows"):
+                _many(validator, [{"book": book.pk, "number": 1}], ValidationContext(None, target))
+
+    def test_an_unchanged_unique_row_is_not_its_own_duplicate(self, book: Book) -> None:
+        edition = Edition.objects.create(book=book, number=1)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        rows = [{"id": edition.pk, "book": book.pk, "number": 1}]
+        validated = _many(validator, rows, _collection(Edition.objects.all()))
+        assert validated.values["items"] == [
+            {"book": book, "number": 1, "id": edition, "DELETE": False}
+        ]
+
+    def test_a_new_row_colliding_with_an_existing_one_is_refused(self, book: Book) -> None:
+        Edition.objects.create(book=book, number=1)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        detail = _many_refusal(
+            validator, {0: {"book": book.pk, "number": 1}}, _collection(Edition.objects.all())
+        )
+        assert list(detail) == [0]
+
+    def test_rows_with_a_key_go_first_and_answer_under_the_callers_index(self, book: Book) -> None:
+        first = Edition.objects.create(book=book, number=1)
+        second = Edition.objects.create(book=book, number=2)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        rows = {
+            0: {"book": book.pk, "number": 3},
+            1: {"id": second.pk, "book": book.pk, "number": "x"},
+            3: {"id": first.pk, "book": book.pk, "number": 1},
+            4: {"book": book.pk},
+        }
+        detail = _many_refusal(validator, rows, _collection(Edition.objects.all()))
+        assert detail == {1: {"number": ["Enter a whole number."]}, 4: {"number": [REQUIRED]}}
+        del rows[1], rows[4]
+        validated = validator.validated_many(
+            rows, _collection(Edition.objects.all()), many_argument="items"
+        )
+        assert [row["id"] for row in validated.values["items"]] == [None, first]
+        formset = validated.pool["formset"]
+        assert formset.initial_form_count() == 1
+        assert formset.forms[0].instance.pk == first.pk
+
+    def test_a_key_outside_the_collection_is_refused(self, book: Book) -> None:
+        inside = Edition.objects.create(book=book, number=1)
+        outside = Edition.objects.create(book=book, number=2)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        context = _collection(Edition.objects.filter(pk=inside.pk))
+        for marker in (False, True):
+            row = {"id": outside.pk, "book": book.pk, "number": 5, "DELETE": marker}
+            detail = _many_refusal(validator, {0: row}, context)
+            assert coded(detail) == {0: {"id": [(_NOT_A_CHOICE, "invalid_choice")]}}
+        assert Edition.objects.get(pk=outside.pk).number == 2
+
+    def test_a_deleted_existing_row_comes_back_with_its_key(self, book: Book) -> None:
+        edition = Edition.objects.create(book=book, number=1)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        rows = [{"id": edition.pk, "book": book.pk, "number": "x", "DELETE": True}]
+        validated = _many(validator, rows, _collection(Edition.objects.all()))
+        assert validated.values["items"] == [{"book": book, "id": edition, "DELETE": True}]
+
+    def test_one_key_sent_twice_is_refused(self, book: Book) -> None:
+        edition = Edition.objects.create(book=book, number=1)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        rows = {
+            0: {"id": edition.pk, "book": book.pk, "number": 1},
+            1: {"id": edition.pk, "book": book.pk, "number": 2},
+        }
+        detail = _many_refusal(validator, rows, _collection(Edition.objects.all()))
+        assert coded(detail) == {
+            "non_field_errors": [("Please correct the duplicate data for id.", "unique")]
+        }
+
+    def test_the_services_collection_is_left_as_it_was(self, book: Book) -> None:
+        edition = Edition.objects.create(book=book, number=1)
+        # Ordered, so Django's formset would read the very rows this cache holds.
+        collection = Edition.objects.order_by("pk")
+        rows = list(collection)
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        _many(
+            validator, [{"id": edition.pk, "book": book.pk, "number": 7}], _collection(collection)
+        )
+        assert [row.number for row in collection] == [1]
+        assert rows[0].number == 1
+
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_a_value_past_its_column_is_refused_before_a_constraint_queries(
+        self, book: Book
+    ) -> None:
+        validator = FormValidator(_EditionSet.form, formset_class=_EditionSet)
+        rows = {0: {"book": book.pk, "number": _BEYOND_THE_COLUMN}}
+        detail = _many_refusal(validator, rows, _collection(Edition.objects.all()))
+        assert coded(detail) == {0: {"number": _PAST_THE_COLUMN}}

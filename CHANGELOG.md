@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`FormValidator(..., formset_class=...)` validates a `many` call as one formset.**
+  Every row is bound into one formset of that class, whose `form` must be the
+  validator's form; each form and the formset's `clean()` run, a row's errors come back
+  under the caller's index and `non_form_errors()` under `non_field_errors`, and the
+  bound formset is in the pool as `formset`. Every row sent is validated, even one equal
+  to the fields' initials. `form_kwargs` is called once for the call and may not return
+  `prefix` or `empty_permitted`. Such a validator's `supports_partial` is `False`. An
+  inline formset and one with `can_order` are refused at construction. Without
+  `formset_class`, each row is validated by a form of its own, as before.
+- **A model formset edits the call's collection target.** With a `BaseModelFormSet`,
+  `parameters()` declares the model's key (optional) and, under `can_delete`, a
+  `DELETE` boolean. The formset is bound to a fresh copy of the collection a collection
+  selector resolves, rows sending a key first as its existing rows, each form bound to
+  its row so its uniqueness checks exclude it; a call with no collection target is
+  refused with `ImproperlyConfigured`. A key outside the collection is refused as
+  `invalid_choice` under the row's key, where Django's own formset would take any row of
+  the model as a new one, and two rows naming one key are refused under
+  `non_field_errors`. A row marked `DELETE` skips its form's checks and is still sent
+  whole.
+
 ## [0.32.0] — 2026-11-13
 
 ### Added

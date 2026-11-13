@@ -13,6 +13,7 @@ from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import BaseValidator, MaxLengthValidator, MinLengthValidator
 from django.db import models
+from django.forms.formsets import DELETION_FIELD_NAME, INITIAL_FORM_COUNT, TOTAL_FORM_COUNT
 from django.http import QueryDict
 from django.utils import formats
 from django.utils.datastructures import MultiValueDict
@@ -28,6 +29,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import coded_messages
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -94,6 +96,11 @@ _SUPPORTED = (
     "ModelChoiceField and ModelMultipleChoiceField, and FileField and ImageField"
 )
 
+
+_FORMSET_KEYWORDS = ("prefix", "empty_permitted")
+"""The form keywords a formset sets for each form, which ``form_kwargs`` may not
+return under one: a ``prefix`` would key every row alike, and every row sent is
+validated, never skipped as an unchanged extra form."""
 
 _LENGTH_VALIDATORS: dict[type[BaseValidator], tuple[str, Callable[[int, int], int]]] = {
     MinLengthValidator: ("minLength", max),
@@ -335,8 +342,9 @@ class FormValidator(Validator):
     seeds it names. It is called on
     every ``validate()``, on the thread the call runs on, which under
     ``adispatch`` is the one its synchronous phases share, so it may query;
-    on a ``many`` call that is once per row, so a query belongs in a seed,
-    which resolves once per call.
+    on a ``many`` call that is once per row, or once for the call under a
+    ``formset_class``, so a query belongs in a seed, which resolves once per
+    call.
     What it returns is passed beside ``data``, ``files`` and ``instance``,
     and returning one of those three, for a plain form as for a
     ``ModelForm``, is refused with ``ImproperlyConfigured`` naming it, as is
@@ -346,6 +354,42 @@ class FormValidator(Validator):
     itself, for a page, builds it the same way with
     [`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords],
     which calls it from the pool dispatch would, the seeds it names included.
+
+    **A ``many`` call is one formset under ``formset_class``.** Without one,
+    ``validated_many()`` binds each row to a form of its own. Given a
+    ``BaseFormSet`` subclass whose ``form`` is ``form_class`` (anything else
+    is refused, as are an inline formset, which needs a parent row, and
+    ``can_order``, whose field is no parameter), it binds every row into one
+    formset, spelled ``<prefix>-<i>-<field>`` as a post spells it, runs each
+    form and the formset's ``clean()``, and refuses with each form's errors
+    under the caller's index for its row and ``non_form_errors()`` under
+    ``non_field_errors``. Every row sent is validated: none is skipped as an
+    unchanged extra form, so a row equal to the fields' initials is still
+    checked. ``form_kwargs`` is called once and handed to every form, and may
+    not return ``prefix`` or ``empty_permitted``, which the formset sets per
+    form. The bound formset is in the call's ``pool`` as ``formset``. A
+    formset validates whole rows, so the validator's ``supports_partial`` is
+    ``False``. Under ``can_delete``, ``parameters()`` declares ``DELETE``, a
+    ``boolean``: a row sent with it ``true`` skips its form's errors, as
+    Django's formset skips them, and reaches the service with ``DELETE``
+    true. A row left out is left alone.
+
+    A ``BaseModelFormSet`` edits the call's collection target, a queryset of
+    its model, which a collection selector resolves; a call with none is
+    refused with ``ImproperlyConfigured``. ``parameters()`` declares the
+    model's key before ``DELETE``: optional, of the JSON type its column
+    takes, as a ``ModelChoiceField``'s. A row sending a key is an existing
+    row, bound first among the formset's initial forms, its errors still
+    answered under its own index, and its form is bound to its row from a
+    fresh copy of the collection, so its uniqueness checks exclude it and
+    the rows the service receives are not changed. A row with no key is a
+    new one. A key outside the collection is refused under the row's key
+    field as ``invalid_choice``, deleted or not: Django's own key field takes
+    any row of the model, and is held to the collection here. Two rows
+    naming one key are refused under ``non_field_errors``, where Django's
+    formset would let the last one win. Each row comes back as its form's
+    ``cleaned_data``, the key cleaned to its row, or ``None`` for a new one.
+    A form field named as one of these additions is refused.
 
     A refusal is one
     [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
@@ -360,6 +404,8 @@ class FormValidator(Validator):
         self,
         form_class: type[forms.BaseForm],
         form_kwargs: Callable[..., Mapping[str, Any]] | None = None,
+        *,
+        formset_class: type[forms.BaseFormSet] | None = None,
     ) -> None:
         # Refuses anything but a form class at construction.
         if not (isinstance(form_class, type) and issubclass(form_class, forms.BaseForm)):
@@ -387,6 +433,10 @@ class FormValidator(Validator):
             for parameter, field in self._declared
             if (clear := _clear_checkbox(form_class, parameter.name, field)) is not None
         }
+        self.formset_class = formset_class
+        self._added = _formset_parameters(form_class, formset_class)
+        if formset_class is not None:
+            self.supports_partial = False
 
     def parameters(self) -> Parameters:
         """The form's class-level fields, in declaration order, as Parameters."""
@@ -396,7 +446,7 @@ class FormValidator(Validator):
             clear = self._clears.get(parameter.name)
             if clear is not None:
                 declared.append(Parameter(clear, "boolean"))
-        return Parameters(tuple(declared))
+        return Parameters((*declared, *self._added))
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
         """The form's ``cleaned_data``, or ``InvalidArguments`` carrying its errors.
@@ -407,17 +457,11 @@ class FormValidator(Validator):
         bound, and so only those are returned; a ``ModelForm``'s uniqueness
         checks still read the whole row, as the class docstring says.
         """
-        fields = {parameter.name: field for parameter, field in self._declared}
-        data: dict[str, list[str]] = {}
-        files: MultiValueDict[str, Any] = MultiValueDict()
-        for name, value in arguments.items():
-            field = fields.get(name)
-            if isinstance(field, forms.FileField):
-                files[name] = value
-            elif value is not None:
-                data[name] = _posted(field, value)
         extra = extra_keywords(self.form_class, self.form_kwargs, context)
-        data, files = self._prefixed(data, files, extra)
+        prefix = extra.get("prefix")
+        if prefix is None:
+            prefix = self.form_class.prefix
+        data, files = self._prefixed(*self._row(arguments), prefix)
         form, row = self._bind(data, files, context.target, extra)
         if context.partial:
             sent = arguments.keys() | {
@@ -432,16 +476,97 @@ class FormValidator(Validator):
             _check_unique_as_whole(row, self._names)
         return dict(form.cleaned_data)
 
+    def validated_many(
+        self,
+        rows: Mapping[int, Mapping[str, Any]],
+        context: ValidationContext,
+        *,
+        many_argument: str,
+    ) -> Validated:
+        """The rows bound into one ``formset_class`` formset, or each its own form without one."""
+        formset_class = self.formset_class
+        if formset_class is None:
+            return super().validated_many(rows, context, many_argument=many_argument)
+        if context.partial:
+            raise ImproperlyConfigured(
+                f"{formset_class.__qualname__}: a formset validates whole rows, and this call "
+                "is partial; drop partial from the spec, or drop the formset_class."
+            )
+        extra = extra_keywords(self.form_class, self.form_kwargs, context)
+        for keyword in _FORMSET_KEYWORDS:
+            if keyword in extra:
+                raise ImproperlyConfigured(
+                    f"{self.form_class.__qualname__}: form_kwargs returned {keyword!r}, which "
+                    f"{formset_class.__qualname__} sets for each form; drop it."
+                )
+        order = list(rows)
+        bound: dict[str, Any] = {}
+        key = None
+        if issubclass(formset_class, forms.BaseModelFormSet):
+            bound["queryset"] = _collection(formset_class, context.target)
+            key = _model(formset_class)._meta.pk.name
+            order.sort(key=lambda index: rows[index].get(key) is None)
+        prefix = formset_class.get_default_prefix()
+        initial = sum(key is not None and rows[index].get(key) is not None for index in order)
+        data = {
+            f"{prefix}-{TOTAL_FORM_COUNT}": [str(len(order))],
+            f"{prefix}-{INITIAL_FORM_COUNT}": [str(initial)],
+        }
+        files: MultiValueDict[str, Any] = MultiValueDict()
+        for position, index in enumerate(order):
+            posted, uploads = self._prefixed(*self._row(rows[index]), f"{prefix}-{position}")
+            data.update(posted)
+            for name in uploads:
+                files.setlist(name, uploads.getlist(name))
+        formset = formset_class(
+            data=_query_dict(data),
+            files=files,
+            form_kwargs={**extra, "empty_permitted": False},
+            **bound,
+        )
+        for form in formset.forms:
+            if key is not None:
+                _narrow(cast(forms.BaseModelFormSet, formset), form.fields[key])
+            clean_held_to_their_columns(form)
+        formset.is_valid()
+        errors: dict[Any, Any] = {}
+        for position, form in enumerate(formset.forms):
+            found = form.errors.as_data()
+            if formset.can_delete and _deleted(formset, form):
+                found = {name: refused for name, refused in found.items() if name == key}
+            if found:
+                errors[order[position]] = _detail(found)
+        refused = [*formset.non_form_errors().as_data(), *_repeated_keys(formset, key)]
+        if refused:
+            errors[NON_FIELD_ERRORS] = coded_messages(refused)
+        if errors:
+            raise InvalidArguments(errors)
+        cleaned = {order[p]: dict(form.cleaned_data) for p, form in enumerate(formset.forms)}
+        values = [cleaned[index] for index in rows]
+        return Validated(values={many_argument: values}, data=values, pool={"formset": formset})
+
+    def _row(
+        self, arguments: Mapping[str, Any]
+    ) -> tuple[dict[str, list[str]], MultiValueDict[str, Any]]:
+        """One row's arguments as a post's strings and its files, keyed by field name."""
+        fields = {parameter.name: field for parameter, field in self._declared}
+        data: dict[str, list[str]] = {}
+        files: MultiValueDict[str, Any] = MultiValueDict()
+        for name, value in arguments.items():
+            field = fields.get(name)
+            if isinstance(field, forms.FileField):
+                files[name] = value
+            elif value is not None:
+                data[name] = _posted(field, value)
+        return data, files
+
     def _prefixed(
         self,
         data: dict[str, list[str]],
         files: MultiValueDict[str, Any],
-        extra: Mapping[str, Any],
+        prefix: str | None,
     ) -> tuple[dict[str, list[str]], MultiValueDict[str, Any]]:
         """``data`` and ``files`` keyed as the bound form reads them."""
-        prefix = extra.get("prefix")
-        if prefix is None:
-            prefix = self.form_class.prefix
         if not prefix:
             return data, files
         keys = self.form_class.__new__(self.form_class)
@@ -471,16 +596,108 @@ class FormValidator(Validator):
         extra: Mapping[str, Any],
     ) -> tuple[forms.BaseForm, models.Model | None]:
         """The bound form, and the copy of the target it edits, or ``None`` for no row."""
-        data = QueryDict(mutable=True)
-        for key, spellings in posted.items():
-            data.setlist(key, spellings)
-        data._mutable = False
+        data = _query_dict(posted)
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
             edits = {"instance": target} if self._takes_instance else {}
             return form_class(data=data, files=files, **edits, **extra), None
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
         return form_class(data=data, files=files, instance=instance, **extra), instance
+
+
+def _query_dict(posted: Mapping[str, list[str]]) -> QueryDict:
+    """``posted`` as an immutable ``QueryDict``, each key holding its list of strings."""
+    data = QueryDict(mutable=True)
+    for key, spellings in posted.items():
+        data.setlist(key, spellings)
+    data._mutable = False
+    return data
+
+
+def _formset_parameters(
+    form_class: type[forms.BaseForm], formset_class: type[forms.BaseFormSet] | None
+) -> tuple[Parameter, ...]:
+    """The fields ``formset_class`` adds to each form, refusing a formset it cannot bind."""
+    if formset_class is None:
+        return ()
+    if not (isinstance(formset_class, type) and issubclass(formset_class, forms.BaseFormSet)):
+        raise ImproperlyConfigured(
+            f"FormValidator takes a Django formset class as formset_class; got {formset_class!r}."
+        )
+    name = formset_class.__qualname__
+    if formset_class.form is not form_class:
+        raise ImproperlyConfigured(
+            f"{name}.form is {formset_class.form.__qualname__}, not "
+            f"{form_class.__qualname__}: the formset builds its own form, so build the "
+            f"validator over it, FormValidator({name}.form, formset_class={name})."
+        )
+    if issubclass(formset_class, forms.BaseInlineFormSet):
+        raise ImproperlyConfigured(
+            f"{name} is an inline formset, which edits one parent row's children and needs "
+            "that row; declare a model formset over the collection instead."
+        )
+    if formset_class.can_order:
+        raise ImproperlyConfigured(
+            f"{name} declares can_order, whose ORDER field is no parameter; drop it."
+        )
+    added: list[Parameter] = []
+    if issubclass(formset_class, forms.BaseModelFormSet):
+        model = _model(formset_class)
+        key = forms.ModelChoiceField(model._default_manager.get_queryset())
+        json_type, fmt = _key_type(key, where=f"{name}.{model._meta.pk.name}")
+        added.append(
+            Parameter(model._meta.pk.name, json_type, format=fmt, required=False, nullable=True)
+        )
+    if formset_class.can_delete:
+        added.append(Parameter(DELETION_FIELD_NAME, "boolean"))
+    for parameter in added:
+        if parameter.name in form_class.base_fields:
+            raise ImproperlyConfigured(
+                f"{form_class.__qualname__}.{parameter.name}: {name} adds a field named "
+                f"{parameter.name!r} to every form; rename the form's field."
+            )
+    return tuple(added)
+
+
+def _model(formset_class: type[forms.BaseModelFormSet]) -> type[models.Model]:
+    """The model a model formset edits, which ``modelformset_factory`` always sets."""
+    return cast(type[models.Model], formset_class.model)
+
+
+def _narrow(formset: forms.BaseModelFormSet, field: forms.Field) -> None:
+    """Hold the key field Django adds, which takes any row of the model, to the formset's set."""
+    key = cast(forms.ModelChoiceField, field)
+    rows = cast(models.QuerySet[Any], key.queryset)
+    key.queryset = rows.filter(pk__in=formset.get_queryset().values("pk"))
+
+
+def _deleted(formset: forms.BaseFormSet, form: forms.BaseForm) -> bool:
+    """Whether the formset reads ``form`` as marked for deletion, through its own hook."""
+    return bool(formset._should_delete_form(form))  # ty: ignore[unresolved-attribute]
+
+
+def _repeated_keys(formset: forms.BaseFormSet, key: str | None) -> list[ValidationError]:
+    """A refusal of two rows naming one row, which Django's formset lets the last one win."""
+    if key is None:
+        return []
+    named = [form.cleaned_data.get(key) for form in formset.forms]
+    rows = [row.pk for row in named if row is not None]
+    if len(set(rows)) == len(rows):
+        return []
+    message = cast(forms.BaseModelFormSet, formset).get_unique_error_message((key,))
+    return [ValidationError(message, code="unique")]
+
+
+def _collection(formset_class: type[forms.BaseModelFormSet], target: Any) -> models.QuerySet[Any]:
+    """A fresh copy of the collection target, or ``ImproperlyConfigured`` for no fitting one."""
+    model = _model(formset_class)
+    if not (isinstance(target, models.QuerySet) and target.model is model):
+        raise ImproperlyConfigured(
+            f"{formset_class.__qualname__}: a model formset edits a collection of "
+            f"{model.__name__} rows, the call's target, which a collection selector on the "
+            "spec resolves; this call has none."
+        )
+    return target.all()
 
 
 def _declares_instance(form_class: type[forms.BaseForm]) -> bool:
