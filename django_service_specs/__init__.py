@@ -79,6 +79,7 @@ from django_service_specs.mutations.update_model import update_model
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.file_presenter import FilePresenter
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
@@ -116,6 +117,7 @@ from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.schema.can_present_nothing import can_present_nothing
+from django_service_specs.schema.file_output import file_output
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
@@ -154,6 +156,8 @@ from django_service_specs.types.build_call_context import build_call_context
 from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.file_result import FileResult
+from django_service_specs.types.file_too_large import FileTooLarge
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.is_supplied import is_supplied
 from django_service_specs.types.no_input import NoInput
@@ -212,6 +216,9 @@ __all__ = [
     "FieldAudience",
     "FieldChange",
     "FieldMarking",
+    "FilePresenter",
+    "FileResult",
+    "FileTooLarge",
     "FormValidator",
     "ForwardRelationSpec",
     "GenericRelationSpec",
@@ -314,6 +321,7 @@ __all__ = [
     "dispatch",
     "enforce_affordances",
     "expected_type_refusal",
+    "file_output",
     "filter_set_parameters",
     "flat_arguments",
     "form_keywords",

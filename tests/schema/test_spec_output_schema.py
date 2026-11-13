@@ -9,6 +9,7 @@ from django_service_specs.dispatch.audience_projection_for_spec import audience_
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.file_presenter import FilePresenter
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
@@ -633,3 +634,21 @@ class TestShapes:
 
         assert "title" not in rows[0]
         assert set(schema["items"]["required"]) <= set(rows[0])
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        pytest.param(retrieve(presenter=FilePresenter("text/csv")), id="selector"),
+        pytest.param(
+            retrieve(presenter=FilePresenter("text/csv"), allow_none=True), id="selector-or-none"
+        ),
+        pytest.param(service(presenter=FilePresenter("text/csv")), id="service"),
+        pytest.param(
+            service(output_selector_spec=retrieve_re_read(presenter=FilePresenter("text/csv"))),
+            id="service-through-its-re-read",
+        ),
+    ],
+)
+def test_a_file_spec_has_no_output_schema(spec: Any) -> None:
+    assert spec_output_schema(spec) is None

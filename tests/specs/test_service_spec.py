@@ -523,23 +523,37 @@ class TestMany:
             ServiceSpec(service=print, many=True)
         assert str(refused.value).startswith("ServiceSpec declares many=True with no validator.")
 
-    @pytest.mark.parametrize(
-        ("role", "selector"),
-        [("instance", RETRIEVE), ("collection", LIST)],
-    )
-    def test_a_target_selector_beside_many_is_refused(
-        self, role: str, selector: SelectorSpec
-    ) -> None:
+    def test_an_instance_selector_beside_many_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(
+                service=print, many=True, validator=Titled(), instance_selector_spec=RETRIEVE
+            )
+        assert str(refused.value).startswith(
+            "ServiceSpec declares an instance_selector_spec with many=True. A list of rows "
+            "edits no single row"
+        )
+
+    def test_a_collection_selector_beside_many_names_the_set_its_rows_edit(self) -> None:
+        listed = SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=PK)
+        spec = ServiceSpec(
+            service=print, many=True, validator=Titled(), collection_selector_spec=listed
+        )
+        assert spec.target_selector_spec() is listed
+        # The set's reads sit at the top level beside the list, never in a row.
+        assert [param.name for param in spec.parameters()] == ["pk", "items"]
+
+    def test_a_row_condition_on_a_many_spec_with_a_collection_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
             ServiceSpec(
                 service=print,
                 many=True,
                 validator=Titled(),
-                **{f"{role}_selector_spec": selector},
+                collection_selector_spec=LIST,
+                affordances=[ON_THE_ROW],
             )
         assert str(refused.value).startswith(
-            f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
-            "resolves no target"
+            "ServiceSpec.affordances[0] ('note_archived') is a condition on the row, and this "
+            "spec operates on a list of rows (many=True)"
         )
 
     def test_a_list_named_after_a_read_is_refused(self) -> None:

@@ -31,7 +31,10 @@ def spec_output_schema(
 
     ``None`` when ``spec.output()`` is ``None``: a spec with no presenter
     declares nothing about what it returns, and a shape invented for it would
-    be a guess every client then trusts. A
+    be a guess every client then trusts. So does a spec presenting a file
+    through a
+    [`FilePresenter`][django_service_specs.output.file_presenter.FilePresenter],
+    which has no JSON shape to describe. A
     [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
     described as the spec it compiles to.
 

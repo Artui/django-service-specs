@@ -3,6 +3,8 @@ from django_service_specs.types.build_call_context import build_call_context
 from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.file_result import FileResult
+from django_service_specs.types.file_too_large import FileTooLarge
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.is_supplied import is_supplied
 from django_service_specs.types.no_input import NoInput
@@ -30,6 +32,8 @@ __all__ = [
     "Affordance",
     "DispatchError",
     "FieldAudience",
+    "FileResult",
+    "FileTooLarge",
     "NoInput",
     "OutputPage",
     "ProgressReporter",
