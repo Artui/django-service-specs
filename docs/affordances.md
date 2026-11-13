@@ -356,6 +356,40 @@ mapping on the selector that returns the rows. A row that carries no answer for
 a name whose spec declares a condition is refused; a name with no conditions
 reads no flag, so every row is available for it.
 
+### Rows that wrap the instance
+
+A tree node, a dataclass row or a table cell builder wraps the model instance
+rather than being it, so its answers have nothing to be set on. The selector's
+`row_object` says where the instance is: an attribute name, or a callable
+taking the row and returning the instance.
+
+```python
+@dataclass(frozen=True)
+class NoteNode:
+    note: Note
+    children: tuple[NoteNode, ...] = ()
+
+
+SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=note_tree,
+    permissions=[Unrestricted()],
+    affordances={"rename": rename_note},
+    row_object="note",  # or row_object=lambda node: node.note
+)
+```
+
+The answers are set on the instance as they are on a model row, one query per
+model for the whole list, and each row comes back unchanged, so a frozen wrapper
+works; `present` and `row_affordance_answers` read them through the same
+`row_object`. Set, it applies to every row, model and mapping rows included. It
+must find a saved instance, or `None` for a row with no object, which answers
+`{"available": false}` for every name with a condition; anything else is refused
+with `ImproperlyConfigured` naming `row_object`. A selector returning a
+`QuerySet` beside it is refused, since a queryset's rows are answered in SQL as
+the model itself. A `row_object` that is neither a non-empty string nor a sync
+callable is refused when the spec is built.
+
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
 describes the object on each item, with or without a projection, and with each
 name's codes enumerated so a client can switch on them:

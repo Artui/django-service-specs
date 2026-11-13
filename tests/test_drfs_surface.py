@@ -432,7 +432,7 @@ SURFACE: dict[str, Pin] = {
         "specs.selector_spec",
         signature="*, kind, selector, permissions=, reads=, shapes=, presenter=, allow_none=, "
         "select_related=, prefetch_related=, annotations=, extend_queryset=, filter_set=, "
-        "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
+        "affordances=, row_object=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "(*, call_context=)", "output": "()"},
     ),
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),

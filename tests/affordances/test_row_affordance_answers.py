@@ -15,7 +15,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import empty_reason, language_reason
+from tests.affordances.utils import Card, empty_reason, language_reason
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
     BOOKS_OPEN,
@@ -266,3 +266,60 @@ class TestALazyReason:
         spec = self.spec_with(empty_reason())
         with pytest.raises(ImproperlyConfigured, match="^Affordance.reason must be a non-empty"):
             row_affordance_answers(spec, {"affordance__rename__c": False})
+
+
+@pytest.mark.django_db
+class TestARowObject:
+    def test_a_wrapper_row_answers_as_its_unwrapped_instance(
+        self, ada: Any, two_notes: tuple[Note, Note]
+    ) -> None:
+        cards = [Card(note) for note in two_notes]
+        spec = listing(lambda: cards, row_object="obj")
+
+        rows = rows_of(spec, ada)
+
+        assert [row_affordance_answers(spec, row) for row in rows] == [
+            row_affordance_answers(listing(), note) for note in two_notes
+        ]
+        assert row_affordance_answers(spec, rows[1])["rename"] == ARCHIVED_ANSWER
+
+    def test_present_puts_the_same_answers_on_each_presented_wrapper(
+        self, ada: Any, two_notes: tuple[Note, Note]
+    ) -> None:
+        spec = listing(lambda: [Card(note) for note in two_notes], row_object="obj")
+        spec = spec.derive(presenter=NoteRows())
+        result = dispatch(spec, principal=ada, arguments={})
+
+        presented = present(spec, result)
+
+        assert [item["affordances"] for item in presented] == [
+            row_affordance_answers(spec, row) for row in result.value
+        ]
+        assert presented[1]["title"] == "archived"
+
+    def test_a_service_spec_reads_its_output_selector_s_row_object(
+        self, ada: Any, two_notes: tuple[Note, Note]
+    ) -> None:
+        card = Card(two_notes[1])
+        output = SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=lambda: card,
+            affordances={"rename": RENAME},
+            row_object="obj",
+        )
+        spec = ServiceSpec(service=print, permissions=OPEN, output_selector_spec=output)
+        assert dispatch(output.derive(permissions=OPEN), principal=ada, arguments={}).value is card
+
+        assert row_affordance_answers(spec, card)["rename"] == ARCHIVED_ANSWER
+
+    def test_a_row_with_no_object_answers_unavailable_where_a_condition_is_declared(
+        self, ada: Any
+    ) -> None:
+        spec = listing(lambda: [Card(None)], row_object="obj")
+
+        (row,) = rows_of(spec, ada)
+
+        assert row_affordance_answers(spec, row) == {
+            "rename": {"available": False},
+            "edit": {"available": True},
+        }

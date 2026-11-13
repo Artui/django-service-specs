@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `reason` is the `str`. Every reason a caller receives is text, so no transport
   changes. A lazy reason that resolves empty is refused there with
   `ImproperlyConfigured`; `code` stays a plain, non-empty `str`.
+- **`SelectorSpec.row_object`**, for rows that wrap their model instance: a tree node,
+  a dataclass row, a table cell builder. An attribute name or a sync callable taking
+  the row and returning the instance; anything else is refused at declaration. Set,
+  it applies to every row: the affordance answers are set on the instance it finds,
+  one query per model for the whole list, and the row comes back unchanged, so a
+  frozen wrapper works. `present` and `row_affordance_answers(spec, row)` read through
+  it. An instance that is not saved, or anything but a model instance or `None`, is
+  refused naming `row_object`; `None` is a row with no object, unavailable for every
+  name with a condition. A `QuerySet` result beside it is refused.
 
 ### Changed
 - **A `FormValidator` binds its form to a `QueryDict` of posted spellings.** The

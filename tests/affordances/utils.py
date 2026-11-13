@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from types import ModuleType
 from typing import Any
 
@@ -34,3 +35,18 @@ def language_reason() -> Promise:
 def empty_reason() -> Promise:
     """A lazy reason that resolves to the empty string."""
     return lazy(str, str)()
+
+
+@dataclass(frozen=True)
+class Card:
+    """A frozen row wrapping the note it shows, as a tree node or a table cell does."""
+
+    obj: Any
+
+    @property
+    def pk(self) -> Any:
+        return self.obj.pk
+
+    @property
+    def title(self) -> str:
+        return self.obj.title

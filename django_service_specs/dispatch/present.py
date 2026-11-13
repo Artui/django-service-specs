@@ -5,7 +5,11 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.affordances.utils import rendered_affordances, with_affordances
+from django_service_specs.affordances.utils import (
+    rendered_affordances,
+    rendering_selector,
+    with_affordances,
+)
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import sync_result
 from django_service_specs.output.presentation_context import PresentationContext
@@ -90,6 +94,8 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
             "affordances are projected into each presented object, and this spec declares "
             "no presenter to present one. Declare a presenter."
         )
+    selector = rendering_selector(spec)
+    row_object = selector.row_object if selector is not None else None
     value = result.value
     if result.kind == "list":
         items = list(value)
@@ -98,13 +104,13 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
         payload = _presented_rows(presenter, items, result.context)
         if affordances is None:
             return payload
-        return with_affordances(payload, items, affordances, many=True)
+        return with_affordances(payload, items, affordances, many=True, row_object=row_object)
     if value is None or presenter is None:
         return value
     presented = _presented(presenter, value, result.context)
     if affordances is None:
         return presented
-    return with_affordances(presented, value, affordances, many=False)
+    return with_affordances(presented, value, affordances, many=False, row_object=row_object)
 
 
 def _presented(presenter: Presenter, value: Any, context: PresentationContext | None) -> Any:
