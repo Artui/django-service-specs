@@ -867,6 +867,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Presenting a file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../reference/" class="md-nav__link">
         
   
@@ -1612,9 +1639,14 @@ run inside one transaction. A list outside either is refused at
 <code>many_argument</code> as a whole, <code>{"items": ["Ensure this field has no more than
 200 elements."]}</code>, before any row is checked, beside the top level's other
 refusals. Either is refused on a spec that is not <code>many</code>.</p>
-<p>A <code>many</code> spec must declare a Validator and no target selector, since a list of
-rows resolves no target, and a condition on the row among its <code>affordances</code> is
-refused. With no output selector its result is <code>kind="list"</code>, unless the
+<p>A <code>many</code> spec must declare a Validator, and no <code>instance_selector_spec</code>, since
+a list of rows edits no single row. It may declare a <code>collection_selector_spec</code>:
+the set its rows edit. Dispatch resolves and scope-checks it as for any spec
+acting on a collection, and <code>target=</code> stands in for it. The service receives it
+as <code>collection</code>, and <code>validated_many()</code> as the context's <code>target</code>, so a
+Validator binding each row to a member of the set can read it. Without one the
+call resolves no target, and <code>target=</code> is refused. A condition on the row among
+its <code>affordances</code> is refused either way. With no output selector its result is <code>kind="list"</code>, unless the
 service returned <code>None</code>, and the service must return the rows: a mapping, a
 <code>str</code>, <code>bytes</code> or anything else that does not iterate is refused as
 <code>ImproperlyConfigured</code>, naming the service and what it returned. It is the

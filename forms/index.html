@@ -710,6 +710,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-formset-over-a-many-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formset over a many call
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A formset over a many call">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#editing-an-existing-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing an existing set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refusals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -797,6 +825,33 @@
     
   
     Paging and projection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Presenting a file
   
 
     
@@ -975,6 +1030,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-formset-over-a-many-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formset over a many call
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A formset over a many call">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#editing-an-existing-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing an existing set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1527,6 +1610,65 @@ or makes it, so every validation of the call adds to one mapping: two calls of
 Validator's own, since every stage shares the dict. A context built by hand
 has an empty dict of its own, so <code>validate()</code> called off dispatch writes to
 that and needs no guard.</p>
+<h2 id="a-formset-over-a-many-call">A formset over a many call<a class="headerlink" href="#a-formset-over-a-many-call" title="Permanent link">&para;</a></h2>
+<p>A <code>many</code> spec over a <code>FormValidator</code> validates each row with a form of its
+own, so no rule sees the whole set. Hand it a formset class and it binds
+every row into one formset instead, and the formset's <code>clean()</code> is the
+rule over the set:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">LineForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">title</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">Lines</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">BaseFormSet</span><span class="p">):</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="n">titles</span> <span class="o">=</span> <span class="p">[</span><span class="n">form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"title"</span><span class="p">)</span> <span class="k">for</span> <span class="n">form</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">forms</span><span class="p">]</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">titles</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">titles</span><span class="p">)):</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="k">raise</span> <span class="n">forms</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">(</span><span class="s2">"Each title once."</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="s2">"repeated"</span><span class="p">)</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="n">LineSet</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">formset_factory</span><span class="p">(</span><span class="n">LineForm</span><span class="p">,</span> <span class="n">formset</span><span class="o">=</span><span class="n">Lines</span><span class="p">)</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="n">add_lines_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="n">service</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">items</span><span class="p">:</span> <span class="n">items</span><span class="p">,</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">Unrestricted</span><span class="p">()],</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    <span class="n">many</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">FormValidator</span><span class="p">(</span><span class="n">LineForm</span><span class="p">,</span> <span class="n">formset_class</span><span class="o">=</span><span class="n">LineSet</span><span class="p">),</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The formset's <code>form</code> must be the validator's form, so for a factory that
+builds its own (<code>modelformset_factory</code> always does) pass
+<code>FormValidator(BookSet.form, formset_class=BookSet)</code>. A refusal comes back as
+the list's own node: each row's errors under the index the caller sent it at,
+and what <code>clean()</code> or the formset's own <code>max_num</code> and <code>min_num</code> checks raise
+under <code>non_field_errors</code>, <code>{"items": {"non_field_errors": ["Each title once."]}}</code>.
+Every row sent is validated, even one equal to the fields' initials, which a
+formset on a page would skip as an unchanged extra form. <code>form_kwargs</code> is
+called once for the call, not once per row, and the bound formset is in the
+pool as <code>formset</code>. A formset validates whole rows, so such a spec cannot be
+<code>partial</code>, and a spec that is not <code>many</code> is refused when it is called.</p>
+<h3 id="editing-an-existing-set">Editing an existing set<a class="headerlink" href="#editing-an-existing-set" title="Permanent link">&para;</a></h3>
+<p>A model formset edits the rows a collection selector resolves, and refuses a
+call that resolves none. The validator then declares two more parameters
+on each row: the model's key (<code>id</code>), optional, and <code>DELETE</code>, a boolean, when
+the formset class says <code>can_delete</code>.</p>
+<ul>
+<li>A row with a key edits that row. Its form is bound to it, so an unchanged
+  unique field is not refused as a duplicate of itself. A key outside the
+  collection is refused under the row's <code>id</code> as <code>invalid_choice</code>: Django's
+  own model formset would take any row of the model and quietly treat it as
+  a new one, and the kernel holds the field to the collection.</li>
+<li>A row with no key, or a <code>null</code> one, is a new row.</li>
+<li>A row sent with <code>DELETE: true</code> skips its form's checks, as a formset does,
+  and reaches the service with its key, the marker and the fields that
+  cleaned: a field its form refused is missing from it, so it is not a whole
+  row. Dispatch's shape check runs before the formset and refuses a row
+  missing a required field. A row left out of the call is left alone.</li>
+<li>Two rows naming one key are refused under <code>non_field_errors</code>.</li>
+</ul>
+<p>The service receives each row as its form's <code>cleaned_data</code>, the key cleaned
+to the row it names (or <code>None</code> for a new one), in the order the caller sent
+them; the rows it reads from the collection are not the instances the forms
+wrote their values onto.</p>
 <h2 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h2>
 <p>A refusal is one
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>

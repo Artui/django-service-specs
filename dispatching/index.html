@@ -977,6 +977,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Presenting a file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../reference/" class="md-nav__link">
         
   
@@ -2090,8 +2117,8 @@ row up itself and runs the checks on it. A missing row that <code>allow_none</co
 let through comes back as <code>DispatchResult(kind="not_found")</code>, so it is never
 mistaken for the <code>None</code> it lets through, and so does a collection selector
 raising <code>Http404</code>. A read, whose selector is its run,
-raises <code>TypeError</code>, and a <code>many</code> write, which has no target,
-<code>ImproperlyConfigured</code>. It is sync; an async caller hops once with
+raises <code>TypeError</code>, and a <code>many</code> write declaring no
+<code>collection_selector_spec</code>, which has no target, <code>ImproperlyConfigured</code>. It is sync; an async caller hops once with
 <code>sync_to_async</code>.</p>
 <p><code>target=</code> on <code>dispatch</code> and <code>adispatch</code> takes any target the caller resolved -
 what an HTTP view's <code>get_object()</code> found, too - and stands in for step three.
