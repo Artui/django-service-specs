@@ -16,9 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same answers, annotations and schema. A read binds to the field `arguments` names,
   else to the output field of its name, else, when one required read is left and the
   output marks one field `HANDLE`, to that field (`id` to `pk`). The reads are the target
-  selector's and the spec's own `reads`, less those a `kwargs` provider fills; a read is
-  required when the shape check demands it of a caller (`provider_reached`), so a link
-  and a call agree. A Validator's field and a `HIDDEN` field never bind.
+  selector's and the spec's own `reads`, less those a `kwargs` provider fills; a target read
+  is required when the shape check demands it of a caller (`provider_reached`), so a link
+  and a call agree about the row; the spec's own reads are the caller's input, never
+  required of the row. A Validator's field and a `HIDDEN` field never bind.
   `ServiceSpec.link_reads()` answers the reads a link may bind. Construction refuses a
   `SpecLink` naming a read the target does not take.
 - **`check_links(registry)`** checks a built registry against itself, returning a Django

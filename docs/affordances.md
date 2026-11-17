@@ -381,11 +381,13 @@ Each read of the target binds by inference: `rename_spec` requires `pk`, which
 no field of `NoteRow` is named, and `id` is its one `HANDLE` field, so `pk`
 binds to `id`. The reads a link binds are the target selector's and the spec's
 own `reads`; a read the target's `kwargs` provider fills is the provider's, and
-a Validator's field is never bound. A read is *required* when the shape check
-demands it of a caller: the target's required reads, less those a provider may
-fill
+a Validator's field is never bound. A read is *required* when it names the
+row: a target selector's required read the shape check demands of a caller,
+less those a provider may fill
 ([`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]),
-so a link and a call never disagree. Each read binds to the field a
+so a link and a call never disagree about the row. The spec's own `reads` are
+the caller's input - a rename's new title - so they bind when a field carries
+them and are never required of the row. Each read binds to the field a
 [`SpecLink`][django_service_specs.types.spec_link.SpecLink] names, else to the
 output field of its name, else, when one *required* read is left and the output
 marks one field `HANDLE`, to that field. An optional read binds only by name or
