@@ -7,12 +7,9 @@ from django_service_specs.affordances.aenforce_affordances import aenforce_affor
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,
 )
-from django_service_specs.affordances.check_links import check_links
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
-from django_service_specs.affordances.link_bindings import link_bindings
 from django_service_specs.affordances.operation_affordances import operation_affordances
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
-from django_service_specs.affordances.row_links import row_links
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
@@ -59,6 +56,9 @@ from django_service_specs.dispatch.seed_named_parameters import seed_named_param
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.dispatch.unreceived_fields import unreceived_fields
 from django_service_specs.flat.flat_arguments import flat_arguments
+from django_service_specs.links.check_links import check_links
+from django_service_specs.links.link_bindings import link_bindings
+from django_service_specs.links.row_links import row_links
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.mutations.adelete_collection import adelete_collection

@@ -8,17 +8,17 @@ from pydantic import BaseModel, Field
 
 from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPresenter
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
-from django_service_specs.affordances.row_links import row_links
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
+from django_service_specs.links.row_links import row_links
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.spec_link import SpecLink
-from tests.affordances.links import RENAME, Declarer, listing
 from tests.dispatch.utils import EDIT, make_user
 from tests.dispatch_app.models import Note
+from tests.links.links import RENAME, Declarer, listing
 
 ARCHIVED = {
     "available": False,

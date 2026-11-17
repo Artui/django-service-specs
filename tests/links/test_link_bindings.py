@@ -9,23 +9,28 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
-from django_service_specs.affordances.link_bindings import link_bindings
+from django_service_specs.links.check_links import check_links
+from django_service_specs.links.link_bindings import link_bindings
+from django_service_specs.links.row_links import row_links
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import OutputField
+from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.spec_link import SpecLink
-from tests.affordances.links import (
+from tests.dispatch.utils import EDIT, OPEN, Record, Titled
+from tests.links.links import (
     PK,
     RENAME,
     TENANT,
     NoOutput,
     Rows,
+    declining,
     listing,
+    needs_pk,
     service,
     target,
     tenant_of,
 )
-from tests.dispatch.utils import EDIT, OPEN, Record
 
 
 class TestInference:
@@ -54,6 +59,18 @@ class TestInference:
     def test_a_read_the_targets_kwargs_fills_is_not_required(self) -> None:
         filled = service().derive(instance_selector_spec=target(PK, TENANT, kwargs=tenant_of))
         assert link_bindings(listing({"rename": filled})) == {"rename": {"pk": "id"}}
+
+    def test_a_declinable_read_is_not_required(self) -> None:
+        spec = service().derive(instance_selector_spec=target(PK, TENANT, kwargs=declining))
+        assert link_bindings(listing({"rename": spec})) == {"rename": {"pk": "id"}}
+
+    def test_a_read_an_untyped_provider_requires_is_required(self) -> None:
+        spec = service().derive(instance_selector_spec=target(PK, TENANT, kwargs=needs_pk))
+        assert link_bindings(listing({"rename": spec})) == {"rename": {"pk": "id"}}
+
+    def test_a_validator_field_never_binds_though_the_output_has_its_name(self) -> None:
+        spec = service(PK, validator=Titled())
+        assert link_bindings(listing({"rename": spec})) == {"rename": {"pk": "id"}}
 
     def test_a_target_with_no_reads_binds_nothing(self) -> None:
         assert link_bindings(listing({"edit": EDIT})) == {"edit": {}}
@@ -162,7 +179,7 @@ class TestTheCache:
         assert link_bindings(spec) == {"rename": {"pk": "id", "title": "title"}}
         assert len(calls) == 1
 
-    def test_a_refusal_is_not_kept_so_a_later_output_binds(self) -> None:
+    def test_an_exception_output_raises_is_not_kept_so_a_later_output_binds(self) -> None:
         @dataclass
         class Row:
             id: Annotated[int, FieldMarking.handle()]
@@ -176,6 +193,22 @@ class TestTheCache:
             assert link_bindings(spec) == {"rename": {"pk": "id"}}
         finally:
             del globals()["Later"]
+
+    def test_an_unchecked_link_is_refused_at_first_use_and_the_refusal_kept(self) -> None:
+        class Counted(NoOutput):
+            calls = 0
+
+            def output(self) -> None:
+                Counted.calls += 1
+
+        spec = listing({"rename": RENAME}, Counted())
+        registry = SpecRegistry()
+        registry.register("notes", spec)
+        for _ in range(2):
+            with pytest.raises(ImproperlyConfigured) as refused:
+                row_links(spec, {"id": 1, "affordances": {"rename": {"available": True}}})
+            assert str(refused.value) == check_links(registry)[0].msg
+        assert Counted.calls == 1
 
     def test_an_entry_goes_with_its_spec(self) -> None:
         spec = listing({"rename": RENAME})

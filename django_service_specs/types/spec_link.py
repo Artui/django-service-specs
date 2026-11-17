@@ -25,7 +25,7 @@ class SpecLink(AffordanceDeclarer):
     the schema are those of the bare spec. The inference reads the rows'
     output, which a presenter may only answer once the apps are loaded, so it
     is checked against a built registry by
-    [`check_links`][django_service_specs.affordances.check_links.check_links],
+    [`check_links`][django_service_specs.links.check_links.check_links],
     never here.
 
     Attributes:
@@ -59,12 +59,12 @@ class SpecLink(AffordanceDeclarer):
                     "SpecLink.arguments maps a read's name to an output field's name, both "
                     f"non-empty strings; got {read!r}: {name!r}."
                 )
-        required, optional = self.spec.link_reads()
-        stray = sorted(set(arguments) - set(required) - set(optional))
+        reads = self.spec.link_reads()
+        stray = sorted(set(arguments) - set(reads))
         if stray:
             raise ImproperlyConfigured(
                 f"SpecLink.arguments binds {stray}, which the linked spec does not read from a "
-                f"row: it reads {[*required, *optional]}. A read its kwargs fills is the "
+                f"row: it reads {list(reads)}. A read its kwargs fills is the "
                 "provider's, and a Validator field is never bound."
             )
         object.__setattr__(self, "arguments", MappingProxyType(dict(arguments)))
@@ -74,6 +74,6 @@ class SpecLink(AffordanceDeclarer):
         """The linked spec's conditions, so a link answers as the bare spec does."""
         return self.spec.affordances
 
-    def link_reads(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        """The linked spec's ``(required, optional)`` reads."""
+    def link_reads(self) -> tuple[str, ...]:
+        """The linked spec's reads."""
         return self.spec.link_reads()

@@ -11,6 +11,6 @@ class AffordanceDeclarer:
     @property
     def affordances(self) -> Sequence[Affordance] | None: ...
 
-    def link_reads(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        """``(required, optional)``: the reads a row's link may fill; none, unless a spec says."""
-        return (), ()
+    def link_reads(self) -> tuple[str, ...]:
+        """The reads a row's link may bind; none, unless a spec says."""
+        return ()

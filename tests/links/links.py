@@ -10,6 +10,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.unset import UnsetType
 from tests.dispatch.utils import NOT_ARCHIVED, OPEN, Record, notes_of
 
 PK = Parameter("pk", "integer", required=True)
@@ -27,6 +28,18 @@ def tenant_of() -> Tenant:
 
 def untyped() -> dict[str, Any]:
     return {}
+
+
+class MayDecline(TypedDict):
+    tenant: str | UnsetType
+
+
+def declining() -> MayDecline:
+    return {"tenant": "acme"}
+
+
+def needs_pk(*, pk: int) -> dict[str, Any]:
+    return {"tenant": "acme"}
 
 
 def target(*reads: Parameter, **fields: Any) -> SelectorSpec:

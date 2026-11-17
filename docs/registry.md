@@ -18,7 +18,8 @@ docs/examples/registry.py:registry
 
 Each entry is a
 [`RegisteredSpec`][django_service_specs.registry.registered_spec.RegisteredSpec]:
-a canonical `name`, the `spec`, and a frozen set of `tags`. That is only the
+a canonical `name`, the `spec`, a frozen set of `tags`, and `displaced`, the
+specs `replace` swapped out of the entry, oldest first. That is only the
 part of an operation that is the same on every transport. An HTTP route's URL
 kwargs, an MCP tool's annotations and an agent adapter's own metadata stay at
 the binding that configures them.
@@ -132,6 +133,7 @@ name, and keeps working.
 | Call | Returns |
 | --- | --- |
 | `get(name)` | The entry, or `None` |
+| `name_of(spec)` | The name `spec` is registered under, matched by identity (a `SpecSource` through the spec it compiles to, a displaced spec too), or `None`; `ValueError` under two names |
 | `all()` | Every entry, in registration order |
 | `queries()` | The `SelectorSpec` entries, in registration order |
 | `mutations()` | The `ServiceSpec` entries, in registration order |
@@ -158,7 +160,8 @@ Four calls derive a new registry from an existing one:
   registered there. The entry keeps its tags and its place in the order, and
   the replacement is checked as `register` checks a spec. A name that is not
   registered raises `KeyError`, since a replacement for an operation nobody
-  registered is a typo rather than a registration.
+  registered is a typo rather than a registration. The entry records the spec
+  it displaced, so a link to the original still finds the name.
 
 `replace` is how a transport serves a variant of an operation without a second
 name for it. The registry holds what every transport shares; a variant shaped

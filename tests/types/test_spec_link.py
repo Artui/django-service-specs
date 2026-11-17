@@ -11,7 +11,8 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.spec_link import SpecLink
-from tests.affordances.links import (
+from tests.dispatch.utils import Titled
+from tests.links.links import (
     PK,
     RENAME,
     TENANT,
@@ -87,28 +88,32 @@ class TestConstructionRefuses:
         with pytest.raises(ImproperlyConfigured, match=r"binds \['tenant'\]"):
             SpecLink(filled, arguments={"tenant": "title"})
 
+    def test_a_validator_field(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"binds \['title'\].*it reads \['pk'\]"):
+            SpecLink(service(PK, validator=Titled()), arguments={"title": "title"})
+
     def test_a_declarer_with_no_reads_binds_nothing(self) -> None:
-        assert Declarer().link_reads() == ((), ())
+        assert Declarer().link_reads() == ()
         with pytest.raises(ImproperlyConfigured, match=r"binds \['pk'\]"):
             SpecLink(Declarer(), arguments={"pk": "id"})
 
 
 class TestLinkReads:
-    def test_the_targets_required_reads_are_required_and_the_rest_optional(self) -> None:
-        assert RENAME.link_reads() == (("pk",), ("title",))
-        assert service(PK, TITLE).link_reads() == (("pk",), ("title",))
+    def test_the_targets_reads_then_the_specs_own(self) -> None:
+        assert RENAME.link_reads() == ("pk", "title")
+        assert service(PK, TITLE).link_reads() == ("pk", "title")
 
-    def test_a_spec_with_no_target_requires_nothing(self) -> None:
-        assert service(own=(PK,)).link_reads() == ((), ("pk",))
+    def test_a_spec_with_no_target_binds_its_own_reads(self) -> None:
+        assert service(own=(PK,)).link_reads() == ("pk",)
 
-    def test_a_read_the_targets_kwargs_fills_is_not_required(self) -> None:
+    def test_a_read_the_targets_kwargs_fills_is_left_out(self) -> None:
         spec = service().derive(instance_selector_spec=target(PK, TENANT, kwargs=tenant_of))
-        assert spec.link_reads() == (("pk",), ())
+        assert spec.link_reads() == ("pk",)
 
-    def test_an_untyped_provider_may_fill_any_read_so_none_is_required(self) -> None:
+    def test_an_untyped_provider_leaves_every_read(self) -> None:
         spec = service().derive(instance_selector_spec=target(PK, kwargs=untyped))
-        assert spec.link_reads() == ((), ("pk",))
+        assert spec.link_reads() == ("pk",)
 
     def test_a_read_the_specs_own_kwargs_fills_is_left_out(self) -> None:
-        assert service(own=(TENANT, TITLE), kwargs=tenant_of).link_reads() == ((), ("title",))
-        assert service(own=(TITLE,), kwargs=untyped).link_reads() == ((), ("title",))
+        assert service(own=(TENANT, TITLE), kwargs=tenant_of).link_reads() == ("title",)
+        assert service(own=(TITLE,), kwargs=untyped).link_reads() == ("title",)

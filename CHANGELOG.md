@@ -16,10 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same answers, annotations and schema. A read binds to the field `arguments` names,
   else to the output field of its name, else, when one required read is left and the
   output marks one field `HANDLE`, to that field (`id` to `pk`). The reads are the target
-  selector's (required unless its `kwargs` provider fills them) and the spec's own
-  `reads`; a Validator's field and a `HIDDEN` field never bind. `ServiceSpec.link_reads()`
-  answers `(required, optional)`. Construction refuses a `SpecLink` naming a read the
-  target does not take.
+  selector's and the spec's own `reads`, less those a `kwargs` provider fills; a read is
+  required when the shape check demands it of a caller (`provider_reached`), so a link
+  and a call agree. A Validator's field and a `HIDDEN` field never bind.
+  `ServiceSpec.link_reads()` answers the reads a link may bind. Construction refuses a
+  `SpecLink` naming a read the target does not take.
 - **`check_links(registry)`** checks a built registry against itself, returning a Django
   check `Error` for each link leaving a required read unbound, matching two `HANDLE`
   fields, or naming a field the output does not declare or marks `HIDDEN`
@@ -28,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer once the apps are loaded, so it never runs when a spec is built and the kernel
   registers no check: `checks.register(functools.partial(check_links, registry))` makes
   it a system check over the registry a project chooses. `link_bindings(spec)` answers
-  the bindings, `{name: {read: field}}`, once per spec.
+  the bindings, `{name: {read: field}}`, once per spec. A link no check saw is refused at
+  its first use with the same message, and the refusal is kept for the spec. The three
+  live in `django_service_specs.links` and at the package's top level.
 - **`row_links(spec, item, registry=None)`**: each presented affordance of a row as
   `{available, code?, reason?, spec, arguments, name?}`, its availability agreeing with
   `row_affordance_answers`, its arguments the item's values for the bound fields, read

@@ -7,8 +7,8 @@ from django.apps import AppConfig
 from django.core.checks import CheckMessage, Error
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.affordances.link_bindings import link_bindings
 from django_service_specs.affordances.utils import rendered_affordances
+from django_service_specs.links.link_bindings import link_bindings
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -26,7 +26,7 @@ def check_links(
     """The registry checked against itself: an error for each link it cannot bind or name.
 
     Each entry's presented affordances are bound by
-    [`link_bindings`][django_service_specs.affordances.link_bindings.link_bindings],
+    [`link_bindings`][django_service_specs.links.link_bindings.link_bindings],
     which reads the rows' output, and so may need the apps loaded: hence a
     check run when the project chooses, never when a spec is built. Each
     target the registry holds is named through ``name_of``; one it does not

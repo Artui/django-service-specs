@@ -360,7 +360,7 @@ reads no flag, so every row is available for it.
 
 An answer says whether an operation is available for a row; a link also says
 which row field fills which of its reads.
-[`row_links`][django_service_specs.affordances.row_links.row_links] reads one
+[`row_links`][django_service_specs.links.row_links.row_links] reads one
 row's links, here for the listing above, whose `NoteRow` marks `id` as a
 `HANDLE`:
 
@@ -381,16 +381,21 @@ Each read of the target binds by inference: `rename_spec` requires `pk`, which
 no field of `NoteRow` is named, and `id` is its one `HANDLE` field, so `pk`
 binds to `id`. The reads a link binds are the target selector's and the spec's
 own `reads`; a read the target's `kwargs` provider fills is the provider's, and
-a Validator's field is never bound. Each read binds to the field a
+a Validator's field is never bound. A read is *required* when the shape check
+demands it of a caller: the target's required reads, less those a provider may
+fill
+([`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]),
+so a link and a call never disagree. Each read binds to the field a
 [`SpecLink`][django_service_specs.types.spec_link.SpecLink] names, else to the
 output field of its name, else, when one *required* read is left and the output
 marks one field `HANDLE`, to that field. An optional read binds only by name or
 by a `SpecLink`. A field marked `HIDDEN` is never bound, since a link's
-arguments reach its caller. Name a binding inference cannot make by wrapping
-the value:
+arguments reach its caller. Name a binding by wrapping the value; here it
+spells out what inference does, and an output whose key is another field names
+that field instead:
 
 ```python
-affordances = {"rename": SpecLink(rename_spec, arguments={"pk": "note_id"})}
+affordances = {"rename": SpecLink(rename_spec, arguments={"pk": "id"})}
 ```
 
 A bare spec is `SpecLink(spec)`: the answers, their annotations and the schema
@@ -417,7 +422,7 @@ output, and a presenter may only answer it once the apps are loaded - a
 dataclass naming a class defined further down its module, a serializer whose
 fields need the app registry. The rest is checked against a built registry,
 when the project chooses:
-[`check_links`][django_service_specs.affordances.check_links.check_links]
+[`check_links`][django_service_specs.links.check_links.check_links]
 returns a Django check `Error` for each link leaving a required read unbound,
 matching two `HANDLE` fields, or naming a field the output does not declare or
 marks `HIDDEN` (`django_service_specs.E001`), and for each target the registry
@@ -429,9 +434,11 @@ them: check the one the transports read, in one line,
 checks.register(functools.partial(check_links, registry))
 ```
 
-[`link_bindings`][django_service_specs.affordances.link_bindings.link_bindings]
+[`link_bindings`][django_service_specs.links.link_bindings.link_bindings]
 answers the bindings themselves, `{name: {read: field}}`, and raises what the
-check reports.
+check reports. A link no check saw is refused at its first use the same way:
+`row_links` and `link_bindings` raise that message as `ImproperlyConfigured`,
+and keep the refusal for the spec, so the output is read once.
 
 ### Rows that wrap the instance
 

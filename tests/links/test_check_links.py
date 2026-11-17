@@ -5,10 +5,10 @@ import functools
 from django.core.checks import Error
 from django.core.checks.registry import CheckRegistry
 
-from django_service_specs.affordances.check_links import check_links
+from django_service_specs.links.check_links import check_links
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.types.spec_link import SpecLink
-from tests.affordances.links import RENAME, Declarer, NoOutput, listing
+from tests.links.links import RENAME, Declarer, NoOutput, listing
 
 
 def registry_of(**specs: object) -> SpecRegistry:

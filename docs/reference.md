@@ -145,9 +145,9 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
 ::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
 ::: django_service_specs.affordances.row_affordance_answers.row_affordance_answers
-::: django_service_specs.affordances.row_links.row_links
-::: django_service_specs.affordances.link_bindings.link_bindings
-::: django_service_specs.affordances.check_links.check_links
+::: django_service_specs.links.row_links.row_links
+::: django_service_specs.links.link_bindings.link_bindings
+::: django_service_specs.links.check_links.check_links
 
 ## Authorization
 
