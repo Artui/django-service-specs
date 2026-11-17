@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-11-17
+
 ### Added
 - **Spec links: what a row leads to, and how to call it.** `SpecLink(spec,
   arguments={read: field})` is a `SelectorSpec.affordances` value naming which row field
@@ -2807,7 +2809,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/Artui/django-service-specs/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Artui/django-service-specs/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Artui/django-service-specs/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Artui/django-service-specs/compare/v0.30.0...v0.31.0
