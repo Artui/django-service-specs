@@ -5,8 +5,9 @@ from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
-from django_service_specs.affordances.utils import AFFORDANCES_KEY, rendered_affordances
+from django_service_specs.affordances.utils import rendered_affordances
 from django_service_specs.links.link_bindings import link_bindings
 from django_service_specs.links.utils import required_reads
 from django_service_specs.registry.spec_registry import SpecRegistry
