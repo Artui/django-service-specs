@@ -1,4 +1,5 @@
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,
 )
@@ -10,6 +11,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
 )
 
 __all__ = [
+    "AFFORDANCES_KEY",
     "aenforce_affordances",
     "aunmet_operation_affordance",
     "enforce_affordances",

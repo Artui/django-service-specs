@@ -576,6 +576,9 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "check_links",
         "link_bindings",
         "row_links",
+        # The key a presented item carries its answers under, which a transport
+        # reads them off: drfs neither wraps nor re-exports it.
+        "AFFORDANCES_KEY",
         # A transport's binding of declared parameters to server values: the
         # transports that bind call these from this package, and
         # djangorestframework-services neither wraps nor re-exports them. A

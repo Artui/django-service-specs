@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carries, a rename's current `title` say, which is the caller's input and no part of the
   route, so `reverse(name, kwargs=arguments)` raised `NoReverseMatch`. `arguments` is
   unchanged.
+- **`AFFORDANCES_KEY` is exported from the package root**, the key a presented item
+  carries its affordance answers under (`"affordances"`), so a transport reading them
+  names the kernel's constant instead of restating it.
 
 ## [0.34.0] — 2026-11-17
 
