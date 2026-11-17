@@ -980,7 +980,8 @@ each transport takes the view it exposes.</p>
   
       dataclass
   " href="../reference/#django_service_specs.registry.registered_spec.RegisteredSpec"><code>RegisteredSpec</code></a>:
-a canonical <code>name</code>, the <code>spec</code>, and a frozen set of <code>tags</code>. That is only the
+a canonical <code>name</code>, the <code>spec</code>, a frozen set of <code>tags</code>, and <code>displaced</code>, the
+specs <code>replace</code> swapped out of the entry, oldest first. That is only the
 part of an operation that is the same on every transport. An HTTP route's URL
 kwargs, an MCP tool's annotations and an agent adapter's own metadata stay at
 the binding that configures them.</p>
@@ -1103,6 +1104,10 @@ name, and keeps working.</p>
 <td>The entry, or <code>None</code></td>
 </tr>
 <tr>
+<td><code>name_of(spec)</code></td>
+<td>The name <code>spec</code> is registered under, matched by identity (a <code>SpecSource</code> through the spec it compiles to, a displaced spec too), or <code>None</code>; <code>ValueError</code> under two names</td>
+</tr>
+<tr>
 <td><code>all()</code></td>
 <td>Every entry, in registration order</td>
 </tr>
@@ -1142,7 +1147,8 @@ screen - comes out the same on every start.</p>
   registered there. The entry keeps its tags and its place in the order, and
   the replacement is checked as <code>register</code> checks a spec. A name that is not
   registered raises <code>KeyError</code>, since a replacement for an operation nobody
-  registered is a typo rather than a registration.</li>
+  registered is a typo rather than a registration. The entry records the spec
+  it displaced, so a link to the original still finds the name.</li>
 </ul>
 <p><code>replace</code> is how a transport serves a variant of an operation without a second
 name for it. The registry holds what every transport shares; a variant shaped

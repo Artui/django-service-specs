@@ -575,6 +575,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#links-what-a-row-leads-to-and-how-to-call-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links: what a row leads to, and how to call it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rows-that-wrap-the-instance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -955,6 +966,17 @@
   
     <nav class="md-nav" aria-label="Answers for each row of a list">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#links-what-a-row-leads-to-and-how-to-call-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Links: what a row leads to, and how to call it
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#rows-that-wrap-the-instance" class="md-nav__link">
@@ -1387,24 +1409,108 @@ against and are never presented, so they count for nothing here; declare the
 mapping on the selector that returns the rows. A row that carries no answer for
 a name whose spec declares a condition is refused; a name with no conditions
 reads no flag, so every row is available for it.</p>
+<h3 id="links-what-a-row-leads-to-and-how-to-call-it">Links: what a row leads to, and how to call it<a class="headerlink" href="#links-what-a-row-leads-to-and-how-to-call-it" title="Permanent link">&para;</a></h3>
+<p>An answer says whether an operation is available for a row; a link also says
+which row field fills which of its reads.
+<a class="autorefs autorefs-internal" title="row_links" href="../reference/#django_service_specs.links.row_links.row_links"><code>row_links</code></a> reads one
+row's links, here for the listing above, whose <code>NoteRow</code> marks <code>id</code> as a
+<code>HANDLE</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">SpecRegistry</span><span class="p">()</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">list_notes_with_answers_spec</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"rename_note"</span><span class="p">,</span> <span class="n">rename_spec</span><span class="p">)</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">note_links</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">list_notes_with_answers_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{},</span> <span class="n">pool_seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="k">return</span> <span class="p">[</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>        <span class="n">row_links</span><span class="p">(</span><span class="n">list_notes_with_answers_spec</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">registry</span><span class="o">=</span><span class="n">registry</span><span class="p">)[</span><span class="s2">"rename"</span><span class="p">]</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">present</span><span class="p">(</span><span class="n">list_notes_with_answers_spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="p">]</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">note_links</span><span class="p">(</span><span class="n">ada</span><span class="p">)</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="c1"># [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "name": "rename_note"},</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1">#  {"available": False, "code": "note_archived", "reason": "...", "spec": rename_spec,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1">#   "arguments": {"pk": 2}, "name": "rename_note"}]</span>
+</span></code></pre></div>
+<p>Each read of the target binds by inference: <code>rename_spec</code> requires <code>pk</code>, which
+no field of <code>NoteRow</code> is named, and <code>id</code> is its one <code>HANDLE</code> field, so <code>pk</code>
+binds to <code>id</code>. The reads a link binds are the target selector's and the spec's
+own <code>reads</code>; a read the target's <code>kwargs</code> provider fills is the provider's, and
+a Validator's field is never bound. A read is <em>required</em> when it names the
+row: a target selector's required read the shape check demands of a caller,
+less those a provider may fill
+(<a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>),
+so a link and a call never disagree about the row. The spec's own <code>reads</code> are
+the caller's input - a rename's new title - so they bind when a field carries
+them and are never required of the row. Each read binds to the field a
+<a class="autorefs autorefs-internal" title="SpecLink
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.spec_link.SpecLink"><code>SpecLink</code></a> names, else to the
+output field of its name, else, when one <em>required</em> read is left and the output
+marks one field <code>HANDLE</code>, to that field. An optional read binds only by name or
+by a <code>SpecLink</code>. A field marked <code>HIDDEN</code> is never bound, since a link's
+arguments reach its caller. Name a binding by wrapping the value; here it
+spells out what inference does, and an output whose key is another field names
+that field instead:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">affordances</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rename"</span><span class="p">:</span> <span class="n">SpecLink</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="s2">"id"</span><span class="p">})}</span>
+</span></code></pre></div>
+<p>A bare spec is <code>SpecLink(spec)</code>: the answers, their annotations and the schema
+are the bare spec's, so wrapping one changes nothing <code>present</code> serves.</p>
+<p><code>row_links</code> reads a presented item before any audience projection, or a raw row
+as <code>row_affordance_answers</code> does, and agrees with it about availability. An
+optional read's field the item does not carry is left out of <code>arguments</code>; a
+required read's raises <code>ImproperlyConfigured</code>, since the link could not be
+called. A raw row is read by the output field's name, by attribute or key, so
+where the output names a field by an alias or a serializer <code>source</code>, read the
+presented item instead. <code>name</code> is the
+target's name in the <code>registry</code> passed, matched by identity, and left out when
+the registry holds none, so a transport that cannot name a target keeps the
+answer.
+<a class="autorefs autorefs-internal" title="name_of" href="../reference/#django_service_specs.registry.spec_registry.SpecRegistry.name_of"><code>SpecRegistry.name_of</code></a>
+answers it: a registered <code>SpecSource</code> matches the spec it compiles to, an
+entry <code>replace</code> swapped matches the spec it displaced as well as its own, and a
+spec registered under two names raises <code>ValueError</code>.</p>
+<p><strong>When the binding is checked.</strong> Construction refuses a <code>SpecLink</code> naming a
+read the target does not take, and nothing more: binding reads the rows'
+output, and a presenter may only answer it once the apps are loaded - a
+dataclass naming a class defined further down its module, a serializer whose
+fields need the app registry. The rest is checked against a built registry,
+when the project chooses:
+<a class="autorefs autorefs-internal" title="check_links" href="../reference/#django_service_specs.links.check_links.check_links"><code>check_links</code></a>
+returns a Django check <code>Error</code> for each link leaving a required read unbound,
+matching two <code>HANDLE</code> fields, or naming a field the output does not declare or
+marks <code>HIDDEN</code> (<code>django_service_specs.E001</code>), and for each target the registry
+holds under two names (<code>django_service_specs.E002</code>). The kernel registers no
+check of its own, since a project may build one registry per app and merge
+them: check the one the transports read, in one line,</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">checks</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">check_links</span><span class="p">,</span> <span class="n">registry</span><span class="p">))</span>
+</span></code></pre></div>
+<p><a class="autorefs autorefs-internal" title="link_bindings" href="../reference/#django_service_specs.links.link_bindings.link_bindings"><code>link_bindings</code></a>
+answers the bindings themselves, <code>{name: {read: field}}</code>, and raises what the
+check reports. A link no check saw is refused at its first use the same way:
+<code>row_links</code> and <code>link_bindings</code> raise that message as <code>ImproperlyConfigured</code>,
+and keep the refusal for the spec, so the output is read once.</p>
 <h3 id="rows-that-wrap-the-instance">Rows that wrap the instance<a class="headerlink" href="#rows-that-wrap-the-instance" title="Permanent link">&para;</a></h3>
 <p>A tree node, a dataclass row or a table cell builder wraps the model instance
 rather than being it, so its answers have nothing to be set on. The selector's
 <code>row_object</code> says where the instance is: an attribute name, or a callable
 taking the row and returning the instance.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoteNode</span><span class="p">:</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">note</span><span class="p">:</span> <span class="n">Note</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">children</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteNode</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="n">SelectorSpec</span><span class="p">(</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">note_tree</span><span class="p">,</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">Unrestricted</span><span class="p">()],</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="n">affordances</span><span class="o">=</span><span class="p">{</span><span class="s2">"rename"</span><span class="p">:</span> <span class="n">rename_note</span><span class="p">},</span>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="n">row_object</span><span class="o">=</span><span class="s2">"note"</span><span class="p">,</span>  <span class="c1"># or row_object=lambda node: node.note</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoteNode</span><span class="p">:</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">note</span><span class="p">:</span> <span class="n">Note</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">children</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteNode</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">note_tree</span><span class="p">,</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">Unrestricted</span><span class="p">()],</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>    <span class="n">affordances</span><span class="o">=</span><span class="p">{</span><span class="s2">"rename"</span><span class="p">:</span> <span class="n">rename_note</span><span class="p">},</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>    <span class="n">row_object</span><span class="o">=</span><span class="s2">"note"</span><span class="p">,</span>  <span class="c1"># or row_object=lambda node: node.note</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>The answers are set on the instance as they are on a model row, one query per
 model for the whole list, and each row comes back unchanged, so a frozen wrapper
@@ -1419,21 +1525,21 @@ callable is refused when the spec is built.</p>
 <p><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
 describes the object on each item, with or without a projection, and with each
 name's codes enumerated so a client can switch on them:</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">"rename"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">        </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"boolean"</span><span class="p">},</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="nt">"enum"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"notes_read_only"</span><span class="p">,</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">]},</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">        </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">}</span>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">      </span><span class="p">},</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">      </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"available"</span><span class="p">]</span>
-</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"rename"</span><span class="p">]</span>
-</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="nt">"rename"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">        </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"boolean"</span><span class="p">},</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="nt">"enum"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"notes_read_only"</span><span class="p">,</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">]},</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">        </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">}</span>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">      </span><span class="p">},</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">      </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"available"</span><span class="p">]</span>
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"rename"</span><span class="p">]</span>
+</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Presenting refuses what would lose or garble the answers: a spec declaring
 <code>affordances</code> with no presenter, a presented row that is not an object or
