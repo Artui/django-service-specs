@@ -261,6 +261,7 @@ class TestLinks:
             "available": True,
             "spec": affordances.rename_spec,
             "arguments": {"pk": draft.pk},
+            "required": ("pk",),
             "name": "rename_note",
         }
         assert second["available"] is False

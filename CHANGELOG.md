@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Each `row_links` entry carries `required`**, the tuple of the link's required read
+  names, the reads the row must fill and each in `arguments`. A transport reversing a URL
+  for a link reverses with those alone: `arguments` also binds an optional read the row
+  carries, a rename's current `title` say, which is the caller's input and no part of the
+  route, so `reverse(name, kwargs=arguments)` raised `NoReverseMatch`. `arguments` is
+  unchanged.
+
 ## [0.34.0] — 2026-11-17
 
 ### Added
