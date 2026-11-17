@@ -1428,9 +1428,10 @@ row's links, here for the listing above, whose <code>NoteRow</code> marks <code>
 </span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="p">]</span>
 </span></code></pre></div>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">note_links</span><span class="p">(</span><span class="n">ada</span><span class="p">)</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="c1"># [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "name": "rename_note"},</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1">#  {"available": False, "code": "note_archived", "reason": "...", "spec": rename_spec,</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1">#   "arguments": {"pk": 2}, "name": "rename_note"}]</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="c1"># [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "required": ("pk",),</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1">#   "name": "rename_note"},</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1">#  {"available": False, "code": "note_archived", "reason": "...", "spec": rename_spec,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1">#   "arguments": {"pk": 2}, "required": ("pk",), "name": "rename_note"}]</span>
 </span></code></pre></div>
 <p>Each read of the target binds by inference: <code>rename_spec</code> requires <code>pk</code>, which
 no field of <code>NoteRow</code> is named, and <code>id</code> is its one <code>HANDLE</code> field, so <code>pk</code>
@@ -1463,7 +1464,12 @@ are the bare spec's, so wrapping one changes nothing <code>present</code> serves
 as <code>row_affordance_answers</code> does, and agrees with it about availability. An
 optional read's field the item does not carry is left out of <code>arguments</code>; a
 required read's raises <code>ImproperlyConfigured</code>, since the link could not be
-called. A raw row is read by the output field's name, by attribute or key, so
+called. <code>required</code> names the link's required reads, each in <code>arguments</code>. A
+transport that reverses a URL for the link reverses with those alone: an
+optional read the row carries - a rename's current <code>title</code> - binds into
+<code>arguments</code> as a default for the caller, and is no part of the route, so
+<code>reverse(name, kwargs=arguments)</code> would find no match where
+<code>reverse(name, kwargs={r: arguments[r] for r in link["required"]})</code> does. A raw row is read by the output field's name, by attribute or key, so
 where the output names a field by an alias or a serializer <code>source</code>, read the
 presented item instead. <code>name</code> is the
 target's name in the <code>registry</code> passed, matched by identity, and left out when

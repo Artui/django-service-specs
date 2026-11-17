@@ -2536,6 +2536,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.affordances_key.AFFORDANCES_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AFFORDANCES_KEY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.links.row_links.row_links" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6437,6 +6448,17 @@
     <span class="md-ellipsis">
       
         row_affordance_answers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.affordances_key.AFFORDANCES_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AFFORDANCES_KEY
       
     </span>
   </a>
@@ -18189,6 +18211,30 @@ flag, and is available for any row.</p>
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="django_service_specs.affordances.affordances_key.AFFORDANCES_KEY" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">AFFORDANCES_KEY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.affordances.affordances_key.AFFORDANCES_KEY" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">AFFORDANCES_KEY</span><span class="p">:</span> <span class="n">Final</span> <span class="o">=</span> <span class="s1">'affordances'</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The key each presented object carries its affordance answers under.</p>
+
+    </div>
+
+</div>
+
 <div class="doc doc-object doc-function">
 
 
@@ -18214,9 +18260,11 @@ flag, and is available for any row.</p>
 the operation the link leads to, and <code>arguments</code>, each read bound by
 <a class="autorefs autorefs-internal" title="link_bindings" href="#django_service_specs.links.link_bindings.link_bindings"><code>link_bindings</code></a>
 with the item's value for its field; an optional read's field the item
-does not carry is left out. With a <code>registry</code>, <code>name</code> is the target's name there, and
-absent when it holds none, so a transport that cannot name a target
-still has the answer.</p>
+does not carry is left out. <code>required</code> names the reads the row must fill, each
+in <code>arguments</code>: a transport reverses a URL with those alone, since an
+optional read is the caller's input. With a <code>registry</code>, <code>name</code> is the
+target's name there, and absent when it holds none, so a transport that
+cannot name a target still has the answer.</p>
 <p><code>item</code> is what <code>present</code> returned, before any audience projection,
 whose answers are read off its <code>affordances</code> key; or a row as dispatch
 handed it over, answered as <code>row_affordance_answers</code> answers it and its
