@@ -200,7 +200,8 @@ class TestAffordances:
         with pytest.raises(ImproperlyConfigured) as refused:
             listing(affordances={"rename": value})
         assert str(refused.value).startswith(
-            f"SelectorSpec.affordances['rename'] must be a ServiceSpec; got {type(value).__name__}."
+            "SelectorSpec.affordances['rename'] must be a ServiceSpec or a SpecLink; got "
+            f"{type(value).__name__}."
         )
 
     def test_an_answer_named_like_a_declared_annotation_is_refused(self) -> None:

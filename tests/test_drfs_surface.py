@@ -318,7 +318,7 @@ SURFACE: dict[str, Pin] = {
     "provider_keys": _fn("pool.provider_keys", "provider"),
     "resolve_callable_kwargs": _fn("pool.resolve_callable_kwargs", "fn, pool"),
     # --- registry -----------------------------------------------------------------------------
-    "RegisteredSpec": Pin("registry.registered_spec", signature="name, spec, tags="),
+    "RegisteredSpec": Pin("registry.registered_spec", signature="name, spec, tags=, displaced="),
     "SpecRegistry": Pin(
         "registry.spec_registry",
         signature="entries=",
@@ -570,6 +570,12 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # presented dicts: djangorestframework-services neither wraps nor
         # re-exports it.
         "row_affordance_answers",
+        # The spec links a row leads to, their bindings and the registry check
+        # over them: transports read them from this package, and drfs takes none.
+        "SpecLink",
+        "check_links",
+        "link_bindings",
+        "row_links",
         # A transport's binding of declared parameters to server values: the
         # transports that bind call these from this package, and
         # djangorestframework-services neither wraps nor re-exports them. A

@@ -41,8 +41,12 @@ class RegisteredSpec:
       views (``registry.by_tag("public")``). Tags carry boolean-ish facts -
       ``"read"``, ``"admin"``, ``"destructive"`` - that every transport can
       interpret in its own vocabulary.
+    - **``displaced``** - the specs ``SpecRegistry.replace`` put this one in
+      place of, oldest first, so ``name_of`` still finds the operation by the
+      spec an affordance names when a transport's registry holds a variant.
     """
 
     name: str
     spec: ServiceSpec | SelectorSpec | SpecSource
     tags: frozenset[str] = frozenset()
+    displaced: tuple[ServiceSpec | SelectorSpec | SpecSource, ...] = ()

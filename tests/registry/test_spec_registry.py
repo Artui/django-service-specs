@@ -365,6 +365,70 @@ class TestReplace:
         with pytest.raises(TypeError, match="'purge'"):
             self._registry().replace("purge", object())  # type: ignore[arg-type]
 
+    def test_the_entry_records_every_spec_it_displaced(self) -> None:
+        registry = self._registry()
+        base = registry.get("refund_order")
+        assert base is not None and base.displaced == ()
+        first, second = _service(), _service()
+
+        twice = registry.replace("refund_order", first).replace("refund_order", second)
+
+        entry = twice.get("refund_order")
+        assert entry is not None
+        assert entry.spec is second
+        assert entry.displaced == (base.spec, first)
+        assert all(
+            held is want for held, want in zip(entry.displaced, (base.spec, first), strict=True)
+        )
+
+
+class TestNameOf:
+    def test_a_registered_spec_answers_its_name_by_identity(self) -> None:
+        registry = SpecRegistry()
+        spec = _service()
+        twin = spec.derive()
+        assert spec == twin
+        registry.register("refund_order", spec)
+
+        assert registry.name_of(spec) == "refund_order"
+        assert registry.name_of(twin) is None
+
+    def test_an_unregistered_spec_answers_none(self) -> None:
+        assert SpecRegistry().name_of(_service()) is None
+
+    def test_a_registered_source_matches_the_spec_it_compiles_to(self) -> None:
+        compiled = _service()
+        source = Foreign(compiled)
+        registry = SpecRegistry()
+        registry.register("refund_order", source)
+
+        assert registry.name_of(compiled) == "refund_order"
+        assert registry.name_of(source) == "refund_order"
+
+    def test_a_replaced_entry_answers_for_the_spec_it_displaced_and_its_own(self) -> None:
+        base = _service()
+        registry = SpecRegistry()
+        registry.register("refund_order", base)
+        variant = base.derive(idempotent=True)
+
+        replaced = registry.replace("refund_order", variant)
+
+        assert replaced.name_of(base) == "refund_order"
+        assert replaced.name_of(variant) == "refund_order"
+        assert registry.name_of(variant) is None
+
+    def test_a_spec_under_two_names_raises(self) -> None:
+        spec = _service()
+        registry = SpecRegistry()
+        registry.register("refund_order", spec)
+        registry.register("refund", spec)
+
+        with pytest.raises(ValueError) as refused:
+            registry.name_of(spec)
+        assert str(refused.value).startswith(
+            "The spec is registered under ['refund_order', 'refund']; a link to it has no one name."
+        )
+
 
 class TestSpecsDict:
     def test_returns_name_to_spec(self) -> None:

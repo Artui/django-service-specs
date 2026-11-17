@@ -55,6 +55,8 @@ LAYERS: dict[str, str] = {
     # the transports reading one share so that each reads it by the same
     # rules; core never imports it.
     "flat": OPT_IN,
+    # Links read the shape check, so they sit above dispatch; core never imports them.
+    "links": OPT_IN,
     "mutations": OPT_IN,
     "relations": OPT_IN,
     "schema": OPT_IN,

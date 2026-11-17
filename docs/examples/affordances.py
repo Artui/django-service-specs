@@ -13,6 +13,7 @@ from django_service_specs import (
     DataclassPresenter,
     DataclassValidator,
     ServiceSpec,
+    SpecRegistry,
     authorize,
     authorize_target,
     base_pool,
@@ -23,6 +24,7 @@ from django_service_specs import (
     present,
     resolve_callable_kwargs,
     row_affordance_answers,
+    row_links,
     unmet_operation_affordance,
 )
 from docs.examples.declaring import IsSignedIn, list_notes_spec
@@ -164,3 +166,20 @@ def rename_offered(user: Any) -> dict[int, bool]:
 
 
 # --8<-- [end:row]
+
+
+# --8<-- [start:links]
+registry = SpecRegistry()
+registry.register("list_notes", list_notes_with_answers_spec)
+registry.register("rename_note", rename_spec)
+
+
+def note_links(user: Any) -> list[dict[str, Any]]:
+    result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
+    return [
+        row_links(list_notes_with_answers_spec, item, registry=registry)["rename"]
+        for item in present(list_notes_with_answers_spec, result)
+    ]
+
+
+# --8<-- [end:links]

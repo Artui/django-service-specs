@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-11-17
+
+### Added
+- **Spec links: what a row leads to, and how to call it.** `SpecLink(spec,
+  arguments={read: field})` is a `SelectorSpec.affordances` value naming which row field
+  fills which read of the operation; a bare `ServiceSpec` is `SpecLink(spec)` and gives
+  the same answers, annotations and schema. A read binds to the field `arguments` names,
+  else to the output field of its name, else, when one required read is left and the
+  output marks one field `HANDLE`, to that field (`id` to `pk`). The reads are the target
+  selector's and the spec's own `reads`, less those a `kwargs` provider fills; a target read
+  is required when the shape check demands it of a caller (`provider_reached`), so a link
+  and a call agree about the row; the spec's own reads are the caller's input, never
+  required of the row. A Validator's field and a `HIDDEN` field never bind.
+  `ServiceSpec.link_reads()` answers the reads a link may bind. Construction refuses a
+  `SpecLink` naming a read the target does not take.
+- **`check_links(registry)`** checks a built registry against itself, returning a Django
+  check `Error` for each link leaving a required read unbound, matching two `HANDLE`
+  fields, or naming a field the output does not declare or marks `HIDDEN`
+  (`django_service_specs.E001`), and for each target held under two names
+  (`django_service_specs.E002`). It reads the rows' output, which a presenter may only
+  answer once the apps are loaded, so it never runs when a spec is built and the kernel
+  registers no check: `checks.register(functools.partial(check_links, registry))` makes
+  it a system check over the registry a project chooses. `link_bindings(spec)` answers
+  the bindings, `{name: {read: field}}`, once per spec. A link no check saw is refused at
+  its first use with the same message, and the refusal is kept for the spec. The three
+  live in `django_service_specs.links` and at the package's top level.
+- **`row_links(spec, item, registry=None)`**: each presented affordance of a row as
+  `{available, code?, reason?, spec, arguments, name?}`, its availability agreeing with
+  `row_affordance_answers`, its arguments the item's values for the bound fields, read
+  off a presented item before audience projection or off a raw row, by the output
+  field's name. An item that does not carry a required read's field is refused with
+  `ImproperlyConfigured`. `name` is the target's name in the registry passed, and left
+  out when the registry holds none.
+- **`SpecRegistry.name_of(spec)`**: the name a spec is registered under, matched by
+  identity, a registered `SpecSource` through the spec it compiles to; `None` when absent,
+  `ValueError` under two names. `replace` records the specs an entry displaced on
+  `RegisteredSpec.displaced`, and `name_of` matches them too.
+
 ## [0.33.0] — 2026-11-13
 
 ### Added
@@ -2777,7 +2815,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/Artui/django-service-specs/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Artui/django-service-specs/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Artui/django-service-specs/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Artui/django-service-specs/compare/v0.30.0...v0.31.0

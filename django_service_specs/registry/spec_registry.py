@@ -139,7 +139,8 @@ class SpecRegistry:
         registered spec's own ``derive(...)``: a variant shaped for one
         transport goes to the registry that transport is handed, while the
         source keeps serving the base. The replacement is checked as
-        ``register`` checks a spec.
+        ``register`` checks a spec, and the entry records the spec it displaced,
+        so ``name_of`` answers this name for either.
 
         Raises:
             KeyError: ``name`` is not registered here - a replacement for an
@@ -149,10 +150,39 @@ class SpecRegistry:
             ImproperlyConfigured: ``spec``, or what it compiles to, has
                 ``permissions is None``.
         """
-        swapped = RegisteredSpec(name=name, spec=spec, tags=self._require(name).tags)
+        held = self._require(name)
+        swapped = RegisteredSpec(
+            name=name, spec=spec, tags=held.tags, displaced=(*held.displaced, held.spec)
+        )
         return SpecRegistry(
             swapped if entry.name == name else entry for entry in self._entries.values()
         )
+
+    def name_of(self, spec: ServiceSpec | SelectorSpec | SpecSource) -> str | None:
+        """The name ``spec`` is registered under here, or ``None``.
+
+        Matched by identity, never by equality: two equal declarations are two
+        operations. An entry matches when it holds ``spec`` or a spec it
+        displaced (see ``replace``), compared as compiled, so a registered
+        [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]
+        matches the spec it compiles to, which is what an affordance names.
+
+        Raises:
+            ValueError: ``spec`` is registered here under more than one name,
+                so no one name is its own.
+        """
+        wanted = kernel_spec(spec)
+        names = [
+            entry.name
+            for entry in self._entries.values()
+            if any(kernel_spec(held) is wanted for held in (entry.spec, *entry.displaced))
+        ]
+        if len(names) > 1:
+            raise ValueError(
+                f"The spec is registered under {names}; a link to it has no one name. Register "
+                "each operation once, or link to the variant a name holds."
+            )
+        return names[0] if names else None
 
     def specs(self) -> dict[str, ServiceSpec | SelectorSpec | SpecSource]:
         """A fresh ``name -> spec`` dict - the shape adapters already accept.
