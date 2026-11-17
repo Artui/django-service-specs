@@ -5,11 +5,7 @@ import functools
 from django.core.checks import Error
 from django.core.checks.registry import CheckRegistry
 
-from django_service_specs.affordances.check_links import (
-    AMBIGUOUS_NAME,
-    UNBOUND_LINK,
-    check_links,
-)
+from django_service_specs.affordances.check_links import check_links
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.types.spec_link import SpecLink
 from tests.affordances.links import RENAME, Declarer, NoOutput, listing
@@ -39,7 +35,7 @@ def test_a_link_that_cannot_bind_is_an_error_naming_the_entry() -> None:
         "declares no output, so only SpecLink arguments bind. Bind them: "
         "SpecLink(spec, arguments={read: field}).",
         obj="notes",
-        id=UNBOUND_LINK,
+        id="django_service_specs.E001",
     )
 
 
@@ -48,7 +44,7 @@ def test_a_target_under_two_names_is_an_error() -> None:
         notes=listing({"rename": SpecLink(RENAME)}), rename=RENAME, rename_note=RENAME
     )
     (error,) = check_links(registry)
-    assert error.id == AMBIGUOUS_NAME
+    assert error.id == "django_service_specs.E002"
     assert error.obj == "notes"
     assert error.msg.startswith(
         "affordances['rename']: The spec is registered under ['rename', 'rename_note']"
@@ -60,4 +56,4 @@ def test_it_registers_as_a_system_check_in_one_line() -> None:
     check_registry = CheckRegistry()
     check_registry.register(functools.partial(check_links, registry))
     (error,) = check_registry.run_checks()
-    assert error.id == UNBOUND_LINK
+    assert error.id == "django_service_specs.E001"

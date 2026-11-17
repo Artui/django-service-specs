@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Final
 
+from django.core.exceptions import ImproperlyConfigured
+
 from django_service_specs.affordances.link_bindings import link_bindings
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
 from django_service_specs.affordances.utils import AFFORDANCES_KEY, rendered_affordances
@@ -29,8 +31,8 @@ def row_links(
     (``available``, and ``code`` and ``reason`` when it is not), plus ``spec``,
     the operation the link leads to, and ``arguments``, each read bound by
     [`link_bindings`][django_service_specs.affordances.link_bindings.link_bindings]
-    with the item's value for its field; a field the item does not carry is
-    left out. With a ``registry``, ``name`` is the target's name there, and
+    with the item's value for its field; an optional read's field the item
+    does not carry is left out. With a ``registry``, ``name`` is the target's name there, and
     absent when it holds none, so a transport that cannot name a target
     still has the answer.
 
@@ -42,7 +44,9 @@ def row_links(
 
     Raises:
         ImproperlyConfigured: as ``link_bindings`` and
-            ``row_affordance_answers`` do.
+            ``row_affordance_answers`` do, or the item does not carry the field
+            a required read binds to - a raw row read for a field the output
+            names by an alias, say.
         ValueError: ``registry`` holds a target under two names.
     """
     bound = link_bindings(spec)
@@ -58,6 +62,15 @@ def row_links(
     for name, declared in affordances.items():
         target = declared.spec if isinstance(declared, SpecLink) else declared
         values = {read: _value(item, field) for read, field in bound[name].items()}
+        required, _ = declared.link_reads()
+        missing = [bound[name][read] for read in required if values[read] is _MISSING]
+        if missing:
+            raise ImproperlyConfigured(
+                f"SelectorSpec.affordances[{name!r}] binds a required read to {missing}, which "
+                f"a {type(item).__name__} row does not carry. A raw row is read by the output "
+                "field's name, so a field named by an alias or a source is read off the "
+                "presented item."
+            )
         link: dict[str, Any] = {
             **answers[name],
             "spec": target,

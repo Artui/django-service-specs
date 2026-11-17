@@ -14,11 +14,8 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.spec_link import SpecLink
 
-UNBOUND_LINK: str = "django_service_specs.E001"
-"""A presented affordance whose link cannot be bound to the rows' output."""
-
-AMBIGUOUS_NAME: str = "django_service_specs.E002"
-"""A link target the registry holds under more than one name."""
+_UNBOUND_LINK = "django_service_specs.E001"
+_AMBIGUOUS_NAME = "django_service_specs.E002"
 
 
 def check_links(
@@ -45,7 +42,7 @@ def check_links(
         try:
             link_bindings(entry.spec)
         except ImproperlyConfigured as refused:
-            errors.append(Error(str(refused), obj=entry.name, id=UNBOUND_LINK))
+            errors.append(Error(str(refused), obj=entry.name, id=_UNBOUND_LINK))
         for name, declared in (rendered_affordances(kernel_spec(entry.spec)) or {}).items():
             target = declared.spec if isinstance(declared, SpecLink) else declared
             if not isinstance(target, ServiceSpec):
@@ -54,6 +51,6 @@ def check_links(
                 registry.name_of(target)
             except ValueError as refused:
                 errors.append(
-                    Error(f"affordances[{name!r}]: {refused}", obj=entry.name, id=AMBIGUOUS_NAME)
+                    Error(f"affordances[{name!r}]: {refused}", obj=entry.name, id=_AMBIGUOUS_NAME)
                 )
     return errors

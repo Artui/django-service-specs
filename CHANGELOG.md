@@ -32,8 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`row_links(spec, item, registry=None)`**: each presented affordance of a row as
   `{available, code?, reason?, spec, arguments, name?}`, its availability agreeing with
   `row_affordance_answers`, its arguments the item's values for the bound fields, read
-  off a presented item before audience projection or off a raw row. `name` is the
-  target's name in the registry passed, and left out when the registry holds none.
+  off a presented item before audience projection or off a raw row, by the output
+  field's name. An item that does not carry a required read's field is refused with
+  `ImproperlyConfigured`. `name` is the target's name in the registry passed, and left
+  out when the registry holds none.
 - **`SpecRegistry.name_of(spec)`**: the name a spec is registered under, matched by
   identity, a registered `SpecSource` through the spec it compiles to; `None` when absent,
   `ValueError` under two names. `replace` records the specs an entry displaced on

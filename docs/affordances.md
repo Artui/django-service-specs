@@ -397,8 +397,12 @@ A bare spec is `SpecLink(spec)`: the answers, their annotations and the schema
 are the bare spec's, so wrapping one changes nothing `present` serves.
 
 `row_links` reads a presented item before any audience projection, or a raw row
-as `row_affordance_answers` does, and agrees with it about availability. A
-field the item does not carry is left out of `arguments`. `name` is the
+as `row_affordance_answers` does, and agrees with it about availability. An
+optional read's field the item does not carry is left out of `arguments`; a
+required read's raises `ImproperlyConfigured`, since the link could not be
+called. A raw row is read by the output field's name, by attribute or key, so
+where the output names a field by an alias or a serializer `source`, read the
+presented item instead. `name` is the
 target's name in the `registry` passed, matched by identity, and left out when
 the registry holds none, so a transport that cannot name a target keeps the
 answer.

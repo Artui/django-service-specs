@@ -89,7 +89,7 @@ def _bind(
         if read not in arguments and read in visible:
             arguments[read] = read
     unbound = [read for read in required if read not in arguments]
-    if len(unbound) == 1 and fields is not None:
+    if len(unbound) == 1:
         handles = [n for n, f in visible.items() if _audience(f) is FieldAudience.HANDLE]
         if len(handles) == 1:
             arguments[unbound.pop()] = handles[0]

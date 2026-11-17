@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from pydantic import BaseModel, Field
 
+from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPresenter
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
 from django_service_specs.affordances.row_links import row_links
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
+from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.registry.spec_registry import SpecRegistry
+from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.spec_link import SpecLink
 from tests.affordances.links import RENAME, Declarer, listing
@@ -30,6 +34,11 @@ def spec_of(**affordances: Any) -> SelectorSpec:
 def presented(spec: SelectorSpec, user: Any) -> tuple[list[Any], list[Any]]:
     result = dispatch(spec, principal=user, arguments={})
     return list(result.value), present(spec, result)
+
+
+class AliasedRow(BaseModel):
+    id: Annotated[int, FieldMarking.handle()] = Field(serialization_alias="note_id")
+    title: str
 
 
 @pytest.fixture
@@ -89,6 +98,34 @@ class TestALink:
         _, items = presented(spec, ada)
         item = {k: v for k, v in items[0].items() if k != "title"}
         assert row_links(spec, item)["rename"]["arguments"] == {"pk": live.pk}
+
+    def test_a_bare_spec_and_its_link_present_and_describe_alike(self, notes: Any) -> None:
+        ada, *_ = notes
+        bare, linked = listing({"rename": RENAME}), listing({"rename": SpecLink(RENAME)})
+        assert presented(bare, ada)[1] == presented(linked, ada)[1]
+        assert spec_output_schema(bare) == spec_output_schema(linked)
+
+    def test_a_raw_mapping_row_is_answered_off_its_own_keys(self) -> None:
+        spec = listing({"rename": RENAME})
+        row = {"id": 7, "title": "t", "affordance__rename__note_archived": False}
+        assert row_links(spec, row) == {
+            "rename": {**ARCHIVED, "spec": RENAME, "arguments": {"pk": 7, "title": "t"}}
+        }
+
+    def test_a_raw_row_missing_a_required_reads_field_raises(self, notes: Any) -> None:
+        ada, live, _ = notes
+        spec = listing({"rename": RENAME}, PydanticPresenter(AliasedRow))
+        rows, items = presented(spec, ada)
+        assert row_links(spec, items[0])["rename"]["arguments"] == {
+            "pk": live.pk,
+            "title": "live",
+        }
+        with pytest.raises(ImproperlyConfigured) as refused:
+            row_links(spec, rows[0])
+        assert str(refused.value).startswith(
+            "SelectorSpec.affordances['rename'] binds a required read to ['note_id'], which a "
+            "Note row does not carry."
+        )
 
     def test_a_spec_presenting_no_affordances_answers_nothing(self, notes: Any) -> None:
         assert row_links(listing(None), {"id": 1}) == {}
