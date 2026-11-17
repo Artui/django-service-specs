@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from django_service_specs.affordances.utils import AFFORDANCES_KEY
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present

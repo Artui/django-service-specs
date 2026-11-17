@@ -11,14 +11,17 @@ from django_service_specs.affordances.row_affordance_answers import row_affordan
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.links.row_links import row_links
+from django_service_specs.links.utils import required_reads
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.output import OutputField
+from django_service_specs.parameters.parameters import Parameter
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.spec_link import SpecLink
 from tests.dispatch.utils import EDIT, make_user
 from tests.dispatch_app.models import Note
-from tests.links.links import RENAME, Declarer, listing
+from tests.links.links import PK, RENAME, TITLE, Declarer, Rows, listing, service
 
 ARCHIVED = {
     "available": False,
@@ -63,13 +66,15 @@ class TestALink:
                 "available": True,
                 "spec": RENAME,
                 "arguments": {"pk": live.pk, "title": "live"},
+                "required": ("pk",),
             },
-            "edit": {"available": True, "spec": EDIT, "arguments": {}},
+            "edit": {"available": True, "spec": EDIT, "arguments": {}, "required": ()},
         }
         assert row_links(spec, second)["rename"] == {
             **ARCHIVED,
             "spec": RENAME,
             "arguments": {"pk": archived.pk, "title": "archived"},
+            "required": ("pk",),
         }
         assert row_links(spec, first)["rename"]["spec"] is RENAME
 
@@ -81,7 +86,9 @@ class TestALink:
             answers = row_affordance_answers(spec, row)
             for links in (row_links(spec, item), row_links(spec, row)):
                 assert {
-                    name: {k: v for k, v in link.items() if k not in ("spec", "arguments")}
+                    name: {
+                        k: v for k, v in link.items() if k not in ("spec", "arguments", "required")
+                    }
                     for name, link in links.items()
                 } == answers
 
@@ -109,7 +116,12 @@ class TestALink:
         spec = listing({"rename": RENAME})
         row = {"id": 7, "title": "t", "affordance__rename__note_archived": False}
         assert row_links(spec, row) == {
-            "rename": {**ARCHIVED, "spec": RENAME, "arguments": {"pk": 7, "title": "t"}}
+            "rename": {
+                **ARCHIVED,
+                "spec": RENAME,
+                "arguments": {"pk": 7, "title": "t"},
+                "required": ("pk",),
+            }
         }
 
     def test_a_raw_row_missing_a_required_reads_field_raises(self, notes: Any) -> None:
@@ -126,6 +138,27 @@ class TestALink:
             "SelectorSpec.affordances['rename'] binds a required read to ['note_id'], which a "
             "Note row does not carry."
         )
+
+    def test_required_names_the_reads_a_transport_reverses_with(self) -> None:
+        spec = listing({"rename": RENAME})
+        row = {"id": 7, "title": "old", "affordances": {"rename": {"available": True}}}
+        link = row_links(spec, row)["rename"]
+        assert link["arguments"] == {"pk": 7, "title": "old"}
+        assert link["required"] == ("pk",)
+        assert {read: link["arguments"][read] for read in link["required"]} == {"pk": 7}
+
+    def test_required_is_required_reads_and_never_an_optional_target_read(self) -> None:
+        loose = service(PK, Parameter("slug", "string"), own=(TITLE,))
+        affordances = {"rename": RENAME, "loose": loose, "edit": SpecLink(EDIT)}
+        spec = listing(affordances, Rows(OutputField("slug", "string")))
+        answers = dict.fromkeys(affordances, {"available": True})
+        row = {"id": 7, "title": "t", "slug": "s", "affordances": answers}
+        links = row_links(spec, row)
+        assert links["loose"]["arguments"] == {"pk": 7, "slug": "s", "title": "t"}
+        for name, declared in affordances.items():
+            assert links[name]["required"] == required_reads(declared)
+        assert links["loose"]["required"] == ("pk",)
+        assert links["edit"]["required"] == ()
 
     def test_a_spec_presenting_no_affordances_answers_nothing(self, notes: Any) -> None:
         assert row_links(listing(None), {"id": 1}) == {}
@@ -175,5 +208,10 @@ class TestNamesFromARegistry:
         _, items = presented(spec, ada)
         links = row_links(spec, items[0], registry=SpecRegistry())
         assert links == {
-            "other": {"available": True, "spec": spec.affordances["other"], "arguments": {}}
-        }  # ty: ignore[non-subscriptable]
+            "other": {
+                "available": True,
+                "spec": spec.affordances["other"],  # ty: ignore[non-subscriptable]
+                "arguments": {},
+                "required": (),
+            }
+        }

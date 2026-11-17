@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.1] — 2026-11-17
+
+### Added
+- **Each `row_links` entry carries `required`**, the tuple of the link's required read
+  names, the reads the row must fill and each in `arguments`. A transport reversing a URL
+  for a link reverses with those alone: `arguments` also binds an optional read the row
+  carries, a rename's current `title` say, which is the caller's input and no part of the
+  route, so `reverse(name, kwargs=arguments)` raised `NoReverseMatch`. `arguments` is
+  unchanged.
+- **`AFFORDANCES_KEY` is exported from the package root**, the key a presented item
+  carries its affordance answers under (`"affordances"`), so a transport reading them
+  names the kernel's constant instead of restating it.
+
 ## [0.34.0] — 2026-11-17
 
 ### Added
@@ -2815,7 +2828,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.1...HEAD
+[0.34.1]: https://github.com/Artui/django-service-specs/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/Artui/django-service-specs/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Artui/django-service-specs/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Artui/django-service-specs/compare/v0.31.0...v0.32.0

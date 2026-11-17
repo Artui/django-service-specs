@@ -4,6 +4,7 @@ from django_service_specs.adapters.filters.filter_set_parameters import filter_s
 from django_service_specs.adapters.forms.form_keywords import form_keywords
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,
 )
@@ -189,6 +190,7 @@ from django_service_specs.validation.validator_parameters import validator_param
 from django_service_specs.version import __version__
 
 __all__ = [
+    "AFFORDANCES_KEY",
     "CALL_SEEDS",
     "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",

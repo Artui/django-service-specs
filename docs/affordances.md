@@ -372,9 +372,10 @@ docs/examples/affordances.py:links
 
 ```python
 note_links(ada)
-# [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "name": "rename_note"},
+# [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "required": ("pk",),
+#   "name": "rename_note"},
 #  {"available": False, "code": "note_archived", "reason": "...", "spec": rename_spec,
-#   "arguments": {"pk": 2}, "name": "rename_note"}]
+#   "arguments": {"pk": 2}, "required": ("pk",), "name": "rename_note"}]
 ```
 
 Each read of the target binds by inference: `rename_spec` requires `pk`, which
@@ -407,7 +408,12 @@ are the bare spec's, so wrapping one changes nothing `present` serves.
 as `row_affordance_answers` does, and agrees with it about availability. An
 optional read's field the item does not carry is left out of `arguments`; a
 required read's raises `ImproperlyConfigured`, since the link could not be
-called. A raw row is read by the output field's name, by attribute or key, so
+called. `required` names the link's required reads, each in `arguments`. A
+transport that reverses a URL for the link reverses with those alone: an
+optional read the row carries - a rename's current `title` - binds into
+`arguments` as a default for the caller, and is no part of the route, so
+`reverse(name, kwargs=arguments)` would find no match where
+`reverse(name, kwargs={r: arguments[r] for r in link["required"]})` does. A raw row is read by the output field's name, by attribute or key, so
 where the output names a field by an alias or a serializer `source`, read the
 presented item instead. `name` is the
 target's name in the `registry` passed, matched by identity, and left out when

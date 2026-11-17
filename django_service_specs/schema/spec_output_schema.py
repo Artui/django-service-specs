@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from django_service_specs.affordances.utils import (
-    AFFORDANCES_KEY,
-    affordance_schema,
-    rendered_affordances,
-)
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
+from django_service_specs.affordances.utils import affordance_schema, rendered_affordances
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.schema.can_present_nothing import can_present_nothing

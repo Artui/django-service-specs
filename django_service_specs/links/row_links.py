@@ -5,8 +5,9 @@ from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
-from django_service_specs.affordances.utils import AFFORDANCES_KEY, rendered_affordances
+from django_service_specs.affordances.utils import rendered_affordances
 from django_service_specs.links.link_bindings import link_bindings
 from django_service_specs.links.utils import required_reads
 from django_service_specs.registry.spec_registry import SpecRegistry
@@ -33,9 +34,11 @@ def row_links(
     the operation the link leads to, and ``arguments``, each read bound by
     [`link_bindings`][django_service_specs.links.link_bindings.link_bindings]
     with the item's value for its field; an optional read's field the item
-    does not carry is left out. With a ``registry``, ``name`` is the target's name there, and
-    absent when it holds none, so a transport that cannot name a target
-    still has the answer.
+    does not carry is left out. ``required`` names the reads the row must fill, each
+    in ``arguments``: a transport reverses a URL with those alone, since an
+    optional read is the caller's input. With a ``registry``, ``name`` is the
+    target's name there, and absent when it holds none, so a transport that
+    cannot name a target still has the answer.
 
     ``item`` is what ``present`` returned, before any audience projection,
     whose answers are read off its ``affordances`` key; or a row as dispatch
@@ -63,9 +66,8 @@ def row_links(
     for name, declared in affordances.items():
         target = declared.spec if isinstance(declared, SpecLink) else declared
         values = {read: _value(item, field) for read, field in bound[name].items()}
-        missing = [
-            bound[name][read] for read in required_reads(declared) if values[read] is _MISSING
-        ]
+        required = required_reads(declared)
+        missing = [bound[name][read] for read in required if values[read] is _MISSING]
         if missing:
             raise ImproperlyConfigured(
                 f"SelectorSpec.affordances[{name!r}] binds a required read to {missing}, which "
@@ -77,6 +79,7 @@ def row_links(
             **answers[name],
             "spec": target,
             "arguments": {read: value for read, value in values.items() if value is not _MISSING},
+            "required": required,
         }
         if registry is not None and isinstance(target, ServiceSpec):
             named = registry.name_of(target)

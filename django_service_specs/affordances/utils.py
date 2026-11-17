@@ -8,6 +8,7 @@ from typing import Any, Final
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, Model, OuterRef
 
+from django_service_specs.affordances.affordances_key import AFFORDANCES_KEY
 from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -20,9 +21,6 @@ from django_service_specs.types.utils import (
     affordance_alias,
     is_row_condition,
 )
-
-AFFORDANCES_KEY: Final = "affordances"
-"""The key each presented object carries its answers under."""
 
 _REASON: Final = "reason"
 
