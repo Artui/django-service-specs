@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Spec links: what a row leads to, and how to call it.** `SpecLink(spec,
+  arguments={read: field})` is a `SelectorSpec.affordances` value naming which row field
+  fills which read of the operation; a bare `ServiceSpec` is `SpecLink(spec)` and gives
+  the same answers, annotations and schema. A read binds to the field `arguments` names,
+  else to the output field of its name, else, when one required read is left and the
+  output marks one field `HANDLE`, to that field (`id` to `pk`). The reads are the target
+  selector's (required unless its `kwargs` provider fills them) and the spec's own
+  `reads`; a Validator's field and a `HIDDEN` field never bind. `ServiceSpec.link_reads()`
+  answers `(required, optional)`. Construction refuses a `SpecLink` naming a read the
+  target does not take.
+- **`check_links(registry)`** checks a built registry against itself, returning a Django
+  check `Error` for each link leaving a required read unbound, matching two `HANDLE`
+  fields, or naming a field the output does not declare or marks `HIDDEN`
+  (`django_service_specs.E001`), and for each target held under two names
+  (`django_service_specs.E002`). It reads the rows' output, which a presenter may only
+  answer once the apps are loaded, so it never runs when a spec is built and the kernel
+  registers no check: `checks.register(functools.partial(check_links, registry))` makes
+  it a system check over the registry a project chooses. `link_bindings(spec)` answers
+  the bindings, `{name: {read: field}}`, once per spec.
+- **`row_links(spec, item, registry=None)`**: each presented affordance of a row as
+  `{available, code?, reason?, spec, arguments, name?}`, its availability agreeing with
+  `row_affordance_answers`, its arguments the item's values for the bound fields, read
+  off a presented item before audience projection or off a raw row. `name` is the
+  target's name in the registry passed, and left out when the registry holds none.
+- **`SpecRegistry.name_of(spec)`**: the name a spec is registered under, matched by
+  identity, a registered `SpecSource` through the spec it compiles to; `None` when absent,
+  `ValueError` under two names. `replace` records the specs an entry displaced on
+  `RegisteredSpec.displaced`, and `name_of` matches them too.
+
 ## [0.33.0] — 2026-11-13
 
 ### Added

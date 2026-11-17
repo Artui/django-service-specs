@@ -110,7 +110,10 @@ class SelectorSpec:
             [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
             whose ``affordances`` are being asked about - the spec objects, not
             registry names, so the read path takes no registry dependency and
-            the declaration stays the one the operation enforces. Each answer is
+            the declaration stays the one the operation enforces. A value may
+            be a [`SpecLink`][django_service_specs.types.spec_link.SpecLink]
+            wrapping the spec, naming which row field fills which of its
+            reads; a bare spec is ``SpecLink(spec)``, and answers the same. Each answer is
             named ``affordance__<name>__<code>``; a collision with a key of
             ``annotations``, or between two entries, is refused at
             construction, because a generated answer silently replacing a
@@ -381,7 +384,7 @@ def _check_affordances(spec: SelectorSpec) -> None:
             )
         if not isinstance(service_spec, AffordanceDeclarer):
             raise ImproperlyConfigured(
-                f"SelectorSpec.affordances[{name!r}] must be a ServiceSpec; got "
+                f"SelectorSpec.affordances[{name!r}] must be a ServiceSpec or a SpecLink; got "
                 f"{type(service_spec).__name__}. The mapping holds the spec whose "
                 "affordances are being asked about, not its registry name."
             )

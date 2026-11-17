@@ -352,6 +352,30 @@ class ServiceSpec(AffordanceDeclarer):
         """The selector resolving what the service acts on, if it declares one."""
         return self.instance_selector_spec or self.collection_selector_spec
 
+    def link_reads(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """``(required, optional)``: the reads a link to this spec from a row may fill.
+
+        Required are the target selector's required reads its ``kwargs`` does
+        not fill; optional are its other reads and this spec's own ``reads``,
+        less what each ``kwargs`` fills. A provider that does not say which
+        keys it fills may fill any, so none of its selector's reads is
+        required. Validator fields never bind: they may need the app registry.
+        """
+        required: list[str] = []
+        optional: list[str] = []
+        target = self.target_selector_spec()
+        if target is not None:
+            keys = provider_keys(target.kwargs)
+            for read in target.reads:
+                if keys is not None and read.name in keys.filled:
+                    continue
+                (required if read.required and keys is not None else optional).append(read.name)
+        own = provider_keys(self.kwargs)
+        optional.extend(
+            read.name for read in self.reads if own is None or read.name not in own.filled
+        )
+        return tuple(required), tuple(optional)
+
     def as_kernel_spec(self) -> Self:
         """This spec, as its own compiled form.
 

@@ -15,7 +15,10 @@ from django_service_specs import (
     AdditionalInputRequired,
     NotPermitted,
     ServiceNotFound,
+    SpecLink,
+    check_links,
     check_requested_input,
+    link_bindings,
     operation_affordances,
     spec_output_schema,
 )
@@ -244,3 +247,33 @@ class TestAnswersReadOffARawRow:
         Note.objects.create(owner=ada, title="Draft")
 
         assert set(affordances.rename_offered(ada).values()) == {False}
+
+
+@pytest.mark.django_db
+class TestLinks:
+    def test_a_row_leads_to_the_operation_with_its_bound_arguments(self, ada: Any) -> None:
+        draft = Note.objects.create(owner=ada, title="Draft")
+        old = Note.objects.create(owner=ada, title="Old", archived=True)
+
+        first, second = affordances.note_links(ada)
+
+        assert first == {
+            "available": True,
+            "spec": affordances.rename_spec,
+            "arguments": {"pk": draft.pk},
+            "name": "rename_note",
+        }
+        assert second["available"] is False
+        assert second["code"] == "note_archived"
+        assert second["arguments"] == {"pk": old.pk}
+
+    def test_the_registry_checks_against_itself(self) -> None:
+        assert check_links(affordances.registry) == []
+
+    def test_the_page_s_explicit_link_binds_as_inference_does(self) -> None:
+        linked = replace(
+            affordances.list_notes_with_answers_spec,
+            affordances={"rename": SpecLink(affordances.rename_spec, arguments={"pk": "id"})},
+        )
+        assert link_bindings(linked) == link_bindings(affordances.list_notes_with_answers_spec)
+        assert link_bindings(linked) == {"rename": {"pk": "id"}}

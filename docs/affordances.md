@@ -356,6 +356,79 @@ mapping on the selector that returns the rows. A row that carries no answer for
 a name whose spec declares a condition is refused; a name with no conditions
 reads no flag, so every row is available for it.
 
+### Links: what a row leads to, and how to call it
+
+An answer says whether an operation is available for a row; a link also says
+which row field fills which of its reads.
+[`row_links`][django_service_specs.affordances.row_links.row_links] reads one
+row's links, here for the listing above, whose `NoteRow` marks `id` as a
+`HANDLE`:
+
+```python
+--8<--
+docs/examples/affordances.py:links
+--8<--
+```
+
+```python
+note_links(ada)
+# [{"available": True, "spec": rename_spec, "arguments": {"pk": 1}, "name": "rename_note"},
+#  {"available": False, "code": "note_archived", "reason": "...", "spec": rename_spec,
+#   "arguments": {"pk": 2}, "name": "rename_note"}]
+```
+
+Each read of the target binds by inference: `rename_spec` requires `pk`, which
+no field of `NoteRow` is named, and `id` is its one `HANDLE` field, so `pk`
+binds to `id`. The reads a link binds are the target selector's and the spec's
+own `reads`; a read the target's `kwargs` provider fills is the provider's, and
+a Validator's field is never bound. Each read binds to the field a
+[`SpecLink`][django_service_specs.types.spec_link.SpecLink] names, else to the
+output field of its name, else, when one *required* read is left and the output
+marks one field `HANDLE`, to that field. An optional read binds only by name or
+by a `SpecLink`. A field marked `HIDDEN` is never bound, since a link's
+arguments reach its caller. Name a binding inference cannot make by wrapping
+the value:
+
+```python
+affordances = {"rename": SpecLink(rename_spec, arguments={"pk": "note_id"})}
+```
+
+A bare spec is `SpecLink(spec)`: the answers, their annotations and the schema
+are the bare spec's, so wrapping one changes nothing `present` serves.
+
+`row_links` reads a presented item before any audience projection, or a raw row
+as `row_affordance_answers` does, and agrees with it about availability. A
+field the item does not carry is left out of `arguments`. `name` is the
+target's name in the `registry` passed, matched by identity, and left out when
+the registry holds none, so a transport that cannot name a target keeps the
+answer.
+[`SpecRegistry.name_of`][django_service_specs.registry.spec_registry.SpecRegistry.name_of]
+answers it: a registered `SpecSource` matches the spec it compiles to, an
+entry `replace` swapped matches the spec it displaced as well as its own, and a
+spec registered under two names raises `ValueError`.
+
+**When the binding is checked.** Construction refuses a `SpecLink` naming a
+read the target does not take, and nothing more: binding reads the rows'
+output, and a presenter may only answer it once the apps are loaded - a
+dataclass naming a class defined further down its module, a serializer whose
+fields need the app registry. The rest is checked against a built registry,
+when the project chooses:
+[`check_links`][django_service_specs.affordances.check_links.check_links]
+returns a Django check `Error` for each link leaving a required read unbound,
+matching two `HANDLE` fields, or naming a field the output does not declare or
+marks `HIDDEN` (`django_service_specs.E001`), and for each target the registry
+holds under two names (`django_service_specs.E002`). The kernel registers no
+check of its own, since a project may build one registry per app and merge
+them: check the one the transports read, in one line,
+
+```python
+checks.register(functools.partial(check_links, registry))
+```
+
+[`link_bindings`][django_service_specs.affordances.link_bindings.link_bindings]
+answers the bindings themselves, `{name: {read: field}}`, and raises what the
+check reports.
+
 ### Rows that wrap the instance
 
 A tree node, a dataclass row or a table cell builder wraps the model instance

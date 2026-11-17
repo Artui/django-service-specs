@@ -7,9 +7,12 @@ from django_service_specs.affordances.aenforce_affordances import aenforce_affor
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,
 )
+from django_service_specs.affordances.check_links import check_links
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
+from django_service_specs.affordances.link_bindings import link_bindings
 from django_service_specs.affordances.operation_affordances import operation_affordances
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
+from django_service_specs.affordances.row_links import row_links
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
@@ -172,6 +175,7 @@ from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
+from django_service_specs.types.spec_link import SpecLink
 from django_service_specs.types.supplied_fields import supplied_fields
 from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unguarded_reason import UnguardedReason
@@ -263,6 +267,7 @@ __all__ = [
     "ServiceNotFound",
     "ServiceSpec",
     "ServiceValidationError",
+    "SpecLink",
     "SpecRegistry",
     "SpecSource",
     "UnguardedReason",
@@ -305,6 +310,7 @@ __all__ = [
     "can_present_nothing",
     "check_arguments",
     "check_call",
+    "check_links",
     "check_permissions",
     "check_requested_input",
     "check_seeds",
@@ -331,6 +337,7 @@ __all__ = [
     "is_queryset",
     "is_supplied",
     "kernel_spec",
+    "link_bindings",
     "materialize_retrieve",
     "max_length_in_force",
     "null_progress",
@@ -351,6 +358,7 @@ __all__ = [
     "resolve_seeds",
     "resolve_target",
     "row_affordance_answers",
+    "row_links",
     "run_selector",
     "run_service",
     "seed_named_parameters",
