@@ -16,6 +16,7 @@ from django_service_specs.adapters.dataclass.dataclass_presenter import Dataclas
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
+from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
@@ -371,3 +372,48 @@ def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> N
         "addresses": [None, {"city": "Oslo", "postcode": None}],
         "tags": [],
     }
+
+
+@dataclass
+class _Stop:
+    waiting: tuple[Address, ...]
+    tags: tuple[str, ...] = ()
+    pair: tuple[Address | None, ...] = ()
+
+
+def test_a_homogeneous_tuple_is_presented_as_a_json_array_of_objects() -> None:
+    stop = _Stop((Address("Oslo", "0150"), Address("Bergen", None)), ("a",))
+    assert DataclassPresenter(_Stop).present(stop) == {
+        "waiting": [{"city": "Oslo", "postcode": "0150"}, {"city": "Bergen", "postcode": None}],
+        "tags": ["a"],
+        "pair": [],
+    }
+
+
+def test_an_empty_tuple_is_presented_as_an_empty_array() -> None:
+    assert DataclassPresenter(_Stop).present(_Stop(()))["waiting"] == []
+
+
+def test_a_tuple_declares_the_output_a_list_does() -> None:
+    @dataclass
+    class AsList:
+        waiting: list[Address]
+        tags: list[str]
+        pair: list[Address | None]
+
+    tupled = DataclassPresenter(_Stop).output()
+    listed = DataclassPresenter(AsList).output()
+    assert [(f.name, f.type, f.items_nullable) for f in tupled] == [
+        (f.name, f.type, f.items_nullable) for f in listed
+    ]
+    assert output_schema(tupled) == output_schema(listed)
+    assert output_schema(tupled)["properties"]["waiting"]["type"] == "array"
+
+
+def test_a_fixed_length_tuple_stays_refused() -> None:
+    @dataclass
+    class Fixed:
+        pair: tuple[int, str]
+
+    with pytest.raises(ImproperlyConfigured, match="no JSON type"):
+        DataclassPresenter(Fixed).output()

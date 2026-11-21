@@ -173,7 +173,6 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (Mapping[str, int], "Mapping[str, int]"),
         (list, "list"),
         (typing.List, "typing.List"),  # noqa: UP006
-        (tuple[int, ...], "tuple[int, ...]"),
         (int | str, "int | str"),
         (None, "None"),
         (UnsetType | None, "None"),
@@ -194,7 +193,8 @@ def test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation(
     assert "has no JSON type this adapter can declare" in message
     assert message.endswith(
         "Use str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
-        "a dataclass, dict[str, ...], or a list of any of these, each optionally '| None'."
+        "a dataclass, dict[str, ...], or a list or tuple[X, ...] of any of these, "
+        "each optionally '| None'."
     )
 
 

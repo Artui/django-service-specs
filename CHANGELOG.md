@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A dataclass field `tuple[X, ...]` is an array, as `list[X]` is.** `DataclassPresenter`
+  refused it with "has no JSON type this adapter can declare", so a spec whose output
+  held a tuple of rows (`RunStop.waiting`) could not be built. It now presents as a JSON
+  array and declares the same output and schema as `list[X]`, an empty tuple as `[]`;
+  `DataclassValidator` declares it an array too and decodes the list into a tuple. A
+  fixed-length `tuple[A, B]` is still refused.
+
 ## [0.34.1] — 2026-11-17
 
 ### Added

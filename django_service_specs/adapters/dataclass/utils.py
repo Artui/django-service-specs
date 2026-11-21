@@ -24,7 +24,8 @@ from django_service_specs.types.unset import UNSET
 
 _SUPPORTED = (
     "str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
-    "a dataclass, dict[str, ...], or a list of any of these, each optionally '| None'"
+    "a dataclass, dict[str, ...], or a list or tuple[X, ...] of any of these, "
+    "each optionally '| None'"
 )
 
 
@@ -154,7 +155,10 @@ def _read(
         )
     elif origin is list and len(args) == 1:
         items, _, _ = _read(args[0], where=where, stack=stack)
-        shape = Shape("array", nullable=nullable, items=items)
+        shape = Shape("array", python=list, nullable=nullable, items=items)
+    elif origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+        items, _, _ = _read(args[0], where=where, stack=stack)
+        shape = Shape("array", python=tuple, nullable=nullable, items=items)
     elif origin is dict and args[:1] == (str,):
         values, _, _ = _read(args[1], where=where, stack=stack)
         shape = Shape("object", python=dict, nullable=nullable, values=values)

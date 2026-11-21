@@ -268,7 +268,8 @@ def _decode(shape: Shape, value: Any) -> Any:
     if shape.items is not None:
         if not isinstance(value, list):
             raise _Refused(expected_type_refusal("array"))
-        return list(_decode_members(shape.items, dict(enumerate(value))).values())
+        decoded = _decode_members(shape.items, dict(enumerate(value))).values()
+        return shape.python(decoded)
     if shape.values is not None:
         if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
             raise _Refused(expected_type_refusal("object"))
