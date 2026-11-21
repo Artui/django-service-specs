@@ -876,3 +876,22 @@ class TestStrKeyedMap:
         assert coded(detail) == {"scores": [("This field cannot be null.", "null")]}
         values = DataclassValidator(_Scored).validate({"scores": {}, "weights": None}, CONTEXT)
         assert values["weights"] is None
+
+
+@dataclass
+class _Held:
+    rows: tuple[Address, ...]
+    tags: tuple[str, ...]
+
+
+def test_a_homogeneous_tuple_is_declared_an_array_and_decoded_to_a_tuple() -> None:
+    validator = DataclassValidator(_Held)
+    assert [(p.name, p.type) for p in validator.parameters()] == [
+        ("rows", "array"),
+        ("tags", "array"),
+    ]
+    held = validator.validate(
+        {"rows": [{"city": "Oslo", "postcode": None}], "tags": ["a", "b"]}, CONTEXT
+    )
+    assert held["tags"] == ("a", "b")
+    assert held["rows"] == (Address("Oslo", None),)
