@@ -2151,7 +2151,7 @@ partial spec over it is refused when the spec is built.</p>
 </tr>
 <tr>
 <td><code>list[X]</code></td>
-<td>An array. <code>list[SomeDataclass]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, so each is read as a decimal is, a JSON number included, and <code>?prices=1.5,2.25</code> is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting bounds it.</td>
+<td>An array. <code>list[SomeDataclass]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, so each is read as a decimal is, a JSON number included, and <code>?prices=1.5,2.25</code> is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting bounds it. A homogeneous <code>tuple[X, ...]</code> is the same array, decoded into a tuple; a fixed-length <code>tuple[A, B]</code> is refused.</td>
 </tr>
 <tr>
 <td>a dataclass</td>
