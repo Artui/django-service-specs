@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.2] — 2026-11-21
+
 ### Fixed
 - **A dataclass field `tuple[X, ...]` is an array, as `list[X]` is.** `DataclassPresenter`
   refused it with "has no JSON type this adapter can declare", so a spec whose output
@@ -2836,7 +2838,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.2...HEAD
+[0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/Artui/django-service-specs/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/Artui/django-service-specs/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/Artui/django-service-specs/compare/v0.32.0...v0.33.0
