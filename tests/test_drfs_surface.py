@@ -598,6 +598,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "max_length_in_force",
         "refusal_messages",
         "relax_partial",
+        "route_captures",
         "sync_answer",
         # What a transport registering kernel specs reads at registration, so
         # that it refuses and relaxes what dispatch would: the transports call
