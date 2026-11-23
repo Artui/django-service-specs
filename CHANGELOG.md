@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON type this adapter can declare", though pydantic's own schema calls it an array. It
   now declares the same output, Parameters and schema as `list[X]` (a `()` default is
   declared as `[]`, at any depth), presents as a JSON array, and validates into a tuple;
-  when presenting, a `strict` model is handed a tuple for it. A fixed-length `tuple[A, B]` is still refused.
+  when presenting, a `strict` model is handed a tuple for it. A fixed-length `tuple[A, B]`
+  is still refused.
 
 ## [0.34.2] — 2026-11-21
 
