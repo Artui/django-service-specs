@@ -56,6 +56,11 @@ def route_captures(
     [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]:
     the call's dict during a call, ``None`` outside one.
 
+    Only a service spec with a Validator has namesakes, each conjunct held by
+    its own test: a selector spec has no Validator
+    (test_a_selector_spec_has_no_namesake), and a service spec may have none
+    (test_a_service_spec_with_no_validator_has_no_namesake).
+
     Raises:
         ImproperlyConfigured: a capture names a ``many`` spec's list, or
             ``mapped`` maps a capture onto a Validator field.
