@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-11-23
+
 ### Added
 - **`route_captures(spec, captured)`: which of a route's captures are arguments.** A URL
   capture holds a converter's `to_python()` value, while a Validator field reads what the
@@ -2931,7 +2933,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.35.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/Artui/django-service-specs/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
 [0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
