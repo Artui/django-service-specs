@@ -24,6 +24,34 @@ the principal, the refusals and their statuses, and CSRF. It also serves a spec
 whose Validator is a [Django form](forms.md) as a page. This package no longer
 ships an HTTP view.
 
+## Which route captures are arguments { #which-route-captures-are-arguments }
+
+A URL converter hands a view its `to_python()` value, while a Validator field
+reads what the caller sent, so a capture named like a field cannot fill it: a
+converter that changes the value (a hashid, say) would hand the field `42` where
+it reads `"h42"`. Every HTTP edge splits a route's captures by one rule,
+[`route_captures`][django_service_specs.specs.route_captures.route_captures]:
+
+```python
+from django_service_specs import route_captures
+
+arguments, namesakes = route_captures(spec, view.kwargs)
+route = {name: view.kwargs[name] for name in arguments}
+```
+
+- A capture naming a read, a target selector's read or a shape is an argument.
+- A capture named like a Validator field is a namesake and no argument. The
+  field stays the caller's, sent in the body; a target selector wanting the
+  route's value reads `view.kwargs` through its `kwargs` provider, as a
+  provider's key named like a field is a namesake too.
+- A capture naming neither keeps each edge's own rule: dropped, or refused as
+  the host's misconfiguration.
+
+An edge that renames its captures hands its mapping as `mapped`; mapping a
+capture onto a Validator field is refused, naming both, since no rename makes a
+URL value the caller's. To fill a field from the route, declare the capture as
+a read and set the field in the service.
+
 ## A refusal, placed on a form { #a-refusal-placed-on-a-form }
 
 django-spec-html's, in

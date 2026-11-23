@@ -199,6 +199,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.combine_progress.combine_progress
 ::: django_service_specs.pool.provider_keys.provider_keys
 ::: django_service_specs.specs.server_owned_keys.server_owned_keys
+::: django_service_specs.specs.route_captures.route_captures
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`route_captures(spec, captured)`: which of a route's captures are arguments.** A URL
+  capture holds a converter's `to_python()` value, while a Validator field reads what the
+  caller sent, so the two cannot share one. The helper takes the captured names
+  (`view.kwargs` will do) and answers two sets: the arguments, every capture naming a read,
+  a target selector's read or a shape; and the namesakes, every capture named like a
+  Validator field, which is no argument and leaves the field the caller's, as a provider's
+  key named like a field already does. A capture naming neither is the edge's to drop or
+  refuse. A capture naming a `many` spec's list is refused, and so is an edge's `mapped`
+  rename of a capture onto a Validator field, naming both. Names only, no resolver or
+  converter, so django-spec-rest and django-spec-html split their captures by one rule.
+
 ## [0.35.0] — 2026-11-23
 
 ### Changed

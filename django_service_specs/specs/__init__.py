@@ -1,5 +1,6 @@
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.kernel_spec import kernel_spec
+from django_service_specs.specs.route_captures import route_captures
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -11,5 +12,6 @@ __all__ = [
     "SpecSource",
     "check_permissions",
     "kernel_spec",
+    "route_captures",
     "server_owned_keys",
 ]
