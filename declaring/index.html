@@ -1748,10 +1748,15 @@ permission check reading such a key from its <code>arguments</code> uses <code>.
 caller's value for a filled key is dropped, and for a declinable one it stands
 beneath the provider's answer. The provider's values reach these: a selector's <code>kwargs</code> fills that selector's <code>reads</code>, a
 service spec's <code>kwargs</code> its <code>reads</code>, and <code>input_data</code> its Validator's fields.
+A spec's <code>kwargs</code> key named like a Validator field, or a target selector's
+<code>kwargs</code> key named like a Validator field or a spec's read, is a namesake:
+the parameter stays the caller's, and the provider's value goes to its own
+callable under that name (<a href="../dispatching/#the-services-pool">the service's pool</a>).
 A provider annotated to fill a parameter declared anywhere else -
-<code>input_data</code> naming a read, <code>kwargs</code> naming a Validator field or the target
-selector's read - is refused with <code>ImproperlyConfigured</code> when the spec is
-built or, for a Validator field, when <code>parameters()</code> is assembled. So is
+<code>input_data</code> naming a read, a spec's <code>kwargs</code> naming the target selector's
+read, any provider naming a shape - is refused with <code>ImproperlyConfigured</code>
+when the spec is built or, if the annotation resolves later, when
+<code>parameters()</code> is assembled. So is
 one annotated to fill a <code>many</code> spec's list, the <code>many_argument</code>, or to
 possibly fill it: no provider reaches it, and a Validator field of the same
 name does not exempt the key.</p>

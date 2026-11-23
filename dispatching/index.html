@@ -386,6 +386,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-services-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The service's pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1059,6 +1076,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-services-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The service's pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1459,6 +1493,31 @@ stands.</p>
   Preconditions follow them, in the same place, as djangorestframework-services
   orders the two.</li>
 </ul>
+<h3 id="the-services-pool">The service's pool<a class="headerlink" href="#the-services-pool" title="Permanent link">&para;</a></h3>
+<p>A write's service, its affordances and its preconditions are handed one pool,
+built in this order, each layer over the one before:</p>
+<ol>
+<li>the seeds, <code>call_context</code> and the call's shapes;</li>
+<li>the Validator's values, spread by name, less a field named like a seed;</li>
+<li>the spec's <code>reads</code>, as the caller sent them;</li>
+<li><code>data</code>, the Validator's validated object;</li>
+<li>what the Validator bound in <code>pool</code>;</li>
+<li>the spec's <code>kwargs</code> provider's answer, over the <code>extra_kwargs</code> beneath it;</li>
+<li>the resolved target, <code>instance</code> or <code>collection</code>.</li>
+</ol>
+<p>So <strong>a <code>kwargs</code> key named like a Validator field is a namesake, not a fill.</strong>
+The field is the caller's: dispatch asks for it, checks it and validates it
+into <code>data</code>. The service's keyword of that name is the provider's answer,
+which outranks the spread value. Sent <code>team_id=5</code> with a provider answering
+<code>999</code>, the service takes <code>team_id=999</code> and <code>data["team_id"] == 5</code>. Beside an
+<code>input_data</code> provider filling the same name with <code>1</code>, <code>data["team_id"]</code> is
+<code>1</code>: the author fills both seats, and they may differ. A target selector's
+<code>kwargs</code> reaches only that selector, so its answer is the selector's keyword
+and never the service's; a Validator field or a <code>reads</code> name of the spec it
+shares is still the caller's. Only <code>input_data</code> fills a Validator field, and
+only the spec's <code>kwargs</code> fills its <code>reads</code>, so
+<a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
+leaves a namesake out, as it does a field named like a registered seed.</p>
 <h2 id="per-call-values-beneath-the-provider">Per-call values beneath the provider<a class="headerlink" href="#per-call-values-beneath-the-provider" title="Permanent link">&para;</a></h2>
 <p>A transport sometimes knows a service keyword per call that the spec cannot
 carry: what an HTTP view's per-request hook returns. <code>dispatch</code> and <code>adispatch</code>

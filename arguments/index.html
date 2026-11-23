@@ -1106,7 +1106,7 @@ these wherever DRF is installed.</p>
 update sends only what changes. A value that is present is checked as it would
 be otherwise, and an unknown key is still refused. Dispatch relaxes a
 <a href="../declaring/#partial-updates"><code>partial</code></a> write's Validator parameters, and a
-parameter a provider is annotated to fill, so a transport checking a call as
+parameter a provider is annotated to fill where its values reach, so a transport checking a call as
 dispatch will calls
 <a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
 rather than <code>check_arguments(partial=True)</code>. Handed the <code>pool_seeds=</code> dispatch
