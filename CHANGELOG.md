@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.3] — 2026-11-23
+
+### Fixed
+- **A pydantic field `tuple[X, ...]` is an array, as `list[X]` is**, as 0.34.2 made it for
+  dataclasses. `PydanticPresenter` and `PydanticValidator` both refused it with "has no
+  JSON type this adapter can declare", though pydantic's own schema calls it an array. It
+  now declares the same output, Parameters and schema as `list[X]` (a `()` default is
+  declared as `[]`, at any depth), presents as a JSON array, and validates into a tuple;
+  when presenting, a `strict` model is handed a tuple for it. A fixed-length `tuple[A, B]`
+  is still refused.
+
 ## [0.34.2] — 2026-11-21
 
 ### Fixed
@@ -2838,7 +2849,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.2...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.3...HEAD
+[0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/Artui/django-service-specs/compare/v0.34.0...v0.34.1
 [0.34.0]: https://github.com/Artui/django-service-specs/compare/v0.33.0...v0.34.0

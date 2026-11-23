@@ -856,3 +856,39 @@ def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None
     assert required is not None
     assert required.required
     assert validator.unsendable == frozenset()
+
+
+class _Held(BaseModel):
+    rows: tuple[Address, ...]
+    tags: tuple[str, ...] = ()
+
+
+class _HeldAsList(BaseModel):
+    rows: list[Address]
+    tags: list[str] = []
+
+
+def test_a_homogeneous_tuple_is_declared_as_a_list_is_and_validated_to_a_tuple() -> None:
+    validator = PydanticValidator(_Held)
+    listed = PydanticValidator(_HeldAsList).parameters()
+    assert validator.parameters() == listed
+    assert parameters_schema(validator.parameters()) == parameters_schema(listed)
+    held = validator.validate({"rows": [{"city": "Oslo"}], "tags": ["a", "b"]}, CONTEXT)
+    assert held["tags"] == ("a", "b")
+    assert held["rows"] == (Address(city="Oslo"),)
+
+
+class _Nested(BaseModel):
+    pairs: list[tuple[int, ...]] = [(1, 2)]
+    named: dict[str, tuple[int, ...]] = {"a": (3,)}
+
+
+class _NestedAsLists(BaseModel):
+    pairs: list[list[int]] = [[1, 2]]
+    named: dict[str, list[int]] = {"a": [3]}
+
+
+def test_a_tuple_inside_a_default_is_declared_as_a_list() -> None:
+    nested = PydanticValidator(_Nested).parameters()
+    assert nested == PydanticValidator(_NestedAsLists).parameters()
+    assert [p.default for p in nested] == [[[1, 2]], {"a": [3]}]

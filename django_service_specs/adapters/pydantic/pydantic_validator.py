@@ -42,7 +42,8 @@ class PydanticValidator(Validator):
     format; ``X | None`` as nullable; ``Literal[...]`` and an ``Enum`` as
     choices; ``Annotated`` looked through; and ``list[X]`` of any of these,
     where ``list[X | None]`` makes the element nullable and not the array
-    and ``list[Decimal]`` declares each element a ``decimal``. On top of
+    and ``list[Decimal]`` declares each element a ``decimal``, with a
+    homogeneous ``tuple[X, ...]`` declared as the same array. On top of
     those:
 
     - a list's length, however the model states it - ``Field(min_length=,

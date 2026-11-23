@@ -172,6 +172,7 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (tuple[str, int], "tuple[str, int]"),
         (tuple[int], "tuple[int]"),
         (tuple[()], "tuple[()]"),
+        (list[int, ...], "list[int, ...]"),
         (Mapping[str, int], "Mapping[str, int]"),
         (list, "list"),
         (typing.List, "typing.List"),  # noqa: UP006

@@ -49,7 +49,7 @@ adapter.
 
 _SUPPORTED = (
     "str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, a pydantic "
-    "model, dict[str, ...], or a list of any of these, each optionally '| None'"
+    "model, dict[str, ...], or a list or tuple[X, ...] of any of these, each optionally '| None'"
 )
 
 
@@ -227,7 +227,16 @@ def _default(info: FieldInfo) -> Any:
     default = info.default
     if default is PydanticUndefined or not is_json_native(default):
         return UNSET
-    return default
+    return _as_json(default)
+
+
+def _as_json(value: Any) -> Any:
+    """``value`` with every tuple, at any depth, as the list JSON sends for it."""
+    if isinstance(value, (list, tuple)):
+        return [_as_json(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _as_json(item) for key, item in value.items()}
+    return value
 
 
 def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
@@ -277,7 +286,10 @@ def _read(
         )
     elif origin is list and len(args) == 1:
         items, _ = _read(args[0], where=where, stack=stack)
-        shape = Shape("array", nullable=nullable, items=items)
+        shape = Shape("array", python=list, nullable=nullable, items=items)
+    elif origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+        items, _ = _read(args[0], where=where, stack=stack)
+        shape = Shape("array", python=tuple, nullable=nullable, items=items)
     elif origin is dict and args[:1] == (str,):
         shape = Shape("object", python=dict, nullable=nullable)
     elif isinstance(base, type) and issubclass(base, Enum):
