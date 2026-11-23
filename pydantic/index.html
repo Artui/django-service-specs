@@ -1114,7 +1114,7 @@ same parameter:</p>
 </tr>
 <tr>
 <td><code>list[X]</code></td>
-<td>An array. <code>list[SomeModel]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, as <code>list[Decimal]</code> on a dataclass does. The list's length is declared: see below.</td>
+<td>An array. <code>list[SomeModel]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, as <code>list[Decimal]</code> on a dataclass does. The list's length is declared: see below. A homogeneous <code>tuple[X, ...]</code> is the same array, validated into a tuple; a fixed-length <code>tuple[A, B]</code> is refused.</td>
 </tr>
 <tr>
 <td>a model</td>

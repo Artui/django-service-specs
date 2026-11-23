@@ -14645,7 +14645,8 @@ the same field declare the same parameter: <code>str</code>, <code>int</code>, <
 format; <code>X | None</code> as nullable; <code>Literal[...]</code> and an <code>Enum</code> as
 choices; <code>Annotated</code> looked through; and <code>list[X]</code> of any of these,
 where <code>list[X | None]</code> makes the element nullable and not the array
-and <code>list[Decimal]</code> declares each element a <code>decimal</code>. On top of
+and <code>list[Decimal]</code> declares each element a <code>decimal</code>, with a
+homogeneous <code>tuple[X, ...]</code> declared as the same array. On top of
 those:</p>
 <ul>
 <li>
