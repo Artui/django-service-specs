@@ -2580,8 +2580,8 @@ def test_an_untyped_input_data_provider_relaxes_the_fields_its_values_reach(ada:
 # A ``kwargs`` provider annotated to fill a read: the spec's own reaches the
 # service, and a selector's own reaches that selector, so a caller is not asked
 # for what the provider answers. Each provider relaxes only the parameters its
-# values reach; one filling a parameter its values never reach is refused when
-# the spec is built (TestProviderReach in tests/specs/test_service_spec.py).
+# values reach; one filling a parameter it never reaches, and may not share, is
+# refused when the spec is built (TestProviderReach in tests/specs/test_service_spec.py).
 
 
 class _ServerProjectPk(TypedDict):

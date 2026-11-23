@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A provider's key may share a name with a parameter of another seat: a namesake, not a
+  fill.** A service spec's typed `kwargs` key named like a Validator field, and a target
+  selector's typed `kwargs` key named like a Validator field or a spec's read, were refused
+  by `parameters()`, `check_seeds` and every transport build, though dispatch runs them.
+  They are accepted, by the rule a field named like a registered seed already follows: the
+  parameter stays the caller's, asked for, checked and validated into `data`, and the
+  provider's value goes to its own callable under that name. For the spec's `kwargs` that is
+  the service's keyword, which outranks the spread field, so a body's `team_id=5` beside a
+  provider's `999` hands the service `team_id=999` and `data["team_id"] == 5`; beside an
+  `input_data` filling it with `1`, `data` holds `1`. A target selector's provider reaches
+  only that selector. The same holds for a `many` spec's row field. `docs/dispatching.md`
+  states the service's pool in order.
+- **`server_owned_keys` leaves a namesake out**, so a transport subtracting it still asks
+  for a parameter `parameters()` marks required. A key `input_data` fills is still in it. A
+  provider naming a read of a seat it does not reach (`input_data` on a read, the spec's
+  `kwargs` on the target's read), a shape, or a `many` spec's list is refused as before.
+
 ## [0.34.4] — 2026-11-23
 
 ### Fixed

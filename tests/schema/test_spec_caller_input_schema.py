@@ -1032,13 +1032,6 @@ def test_a_validator_declaring_no_call_context_is_asked_as_before_under_one(
             r"Parameters \['page'\] are declared by two sources",
             id="a-name-two-sources-declare",
         ),
-        pytest.param(
-            _EXTRA,
-            {"kwargs": _fills_a_row},
-            r"is annotated to fill \['extra'\], which ServiceSpec.validator declares, "
-            r"and its values never reach",
-            id="a-name-a-typed-kwargs-fills",
-        ),
     ],
 )
 def test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks(
@@ -1051,6 +1044,12 @@ def test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_ask
     assert "title" in spec_caller_input_schema(spec)["properties"]
     with pytest.raises(ImproperlyConfigured, match=refusal):
         spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+
+def test_a_field_only_a_transport_declares_stays_asked_beside_a_kwargs_namesake() -> None:
+    spec = _service(validator=_ToOneTransport(_EXTRA), kwargs=_fills_a_row)
+    schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+    assert "extra" in schema["required"]
 
 
 @pytest.mark.django_db

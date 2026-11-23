@@ -47,18 +47,23 @@ def server_owned_keys(
       the key holds the author's value whatever the caller sent. When the
       provider leaves it out or returns ``UNSET``, a parameter declared
       required is refused where the provider's answer is merged, and one
-      that is not is absent.
+      that is not is absent. Less a namesake: a service spec's ``kwargs``
+      key that its Validator declares as a top-level field, and its target
+      selector's ``kwargs`` key that the Validator or the spec's ``reads``
+      declares. The parameter is the caller's, as a seed-named field is, and
+      the provider's value goes to its own callable under that name
+      (test_a_required_parameter_is_never_server_owned).
 
     **No name here is a parameter dispatch demands of the caller**, so a key
     a provider fills is the server's for the whole call. Each provider's
     values reach one seat - a selector's ``kwargs`` that selector's reads, a
     service spec's ``kwargs`` its ``reads``, ``input_data`` its Validator's
     fields - and dispatch does not demand a parameter there that the provider
-    fills. A filled key that a parameter in any other seat declares is
-    refused when the spec is built, or, for a Validator field, when
-    ``parameters()`` is assembled. A ``many`` spec's list, named by
-    ``many_argument``, is such a seat for every provider, since dispatch
-    always demands it of the caller: a key naming it is refused, filled or
+    fills. A namesake is left out above; any other filled key that a
+    parameter in another seat declares is refused when the spec is built, or,
+    for an annotation resolving later, when ``parameters()`` is assembled. A
+    ``many`` spec's list, named by ``many_argument``, is such a seat for every
+    provider, since dispatch always demands it of the caller: a key naming it is refused, filled or
     declinable, even beside a Validator field of that name. A key no
     parameter declares is the server's alone.
 
@@ -94,19 +99,21 @@ def server_owned_keys(
     """
     spec = kernel_spec(spec)
     owned: set[str] = set(pool_seeds.reserved)
+    fields: frozenset[str] = frozenset()
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        declared = validator_parameters(spec.validator, call_context=call_context)
-        owned -= declared.names() & pool_seeds.names
-    providers: list[Callable[..., Any] | None] = [spec.kwargs]
+        fields = validator_parameters(spec.validator, call_context=call_context).names()
+        owned -= fields & pool_seeds.names
+    providers: list[tuple[Callable[..., Any] | None, frozenset[str]]] = [(spec.kwargs, fields)]
     reads = [spec.reads]
     if isinstance(spec, ServiceSpec):
         target = spec.target_selector_spec()
-        providers += [spec.input_data, None if target is None else target.kwargs]
+        providers.append((spec.input_data, frozenset()))
         if target is not None:
+            providers.append((target.kwargs, fields | spec.reads.names()))
             reads.append(target.reads)
     owned |= CALL_SEEDS & {param.name for seat in reads for param in seat if param.reflected}
-    for provider in providers:
+    for provider, namesakes in providers:
         keys = provider_keys(provider)
         if keys is not None:
-            owned |= keys.filled
+            owned |= keys.filled - namesakes
     return frozenset(owned)

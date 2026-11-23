@@ -30,6 +30,9 @@ def provider_reached(
     provider is handed the caller's reads and the seeds, never another
     provider's answer, so the shape check demands it of the caller
     (test_a_read_its_provider_requires_is_not_reached).
+    A provider's key named like a parameter of another seat, a namesake,
+    reaches nothing: the caller still sends that parameter
+    (test_the_caller_schema_still_asks_for_the_field).
     The shape check does not demand a parameter this names, and a transport
     reading it leaves such a parameter out of the arguments its schema
     requires; one a provider is annotated to fill, and may not decline, is

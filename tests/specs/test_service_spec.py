@@ -781,7 +781,7 @@ def _target(**kwargs: Any) -> SelectorSpec:
 
 
 class TestProviderReach:
-    """A typed provider filling a parameter its values never reach is refused."""
+    """A typed provider filling a parameter it never reaches, and may not share, is refused."""
 
     @pytest.mark.parametrize(
         ("declaration", "provider", "key", "where", "reaching"),
@@ -810,27 +810,6 @@ class TestProviderReach:
                 f"{TARGET}.kwargs",
                 id="kwargs-on-a-target-read",
             ),
-            pytest.param(
-                {"reads": PROJECT, "instance_selector_spec": _target(kwargs=_project)},
-                f"{TARGET}.kwargs",
-                "project",
-                "ServiceSpec.reads",
-                "ServiceSpec.kwargs",
-                id="target-kwargs-on-a-read",
-            ),
-            pytest.param(
-                {
-                    "reads": PROJECT,
-                    "collection_selector_spec": SelectorSpec(
-                        kind=SelectorKind.LIST, selector=list, kwargs=_project
-                    ),
-                },
-                "ServiceSpec.collection_selector_spec.kwargs",
-                "project",
-                "ServiceSpec.reads",
-                "ServiceSpec.kwargs",
-                id="collection-kwargs-on-a-read",
-            ),
         ],
     )
     def test_on_a_read_when_the_spec_is_built(
@@ -845,29 +824,51 @@ class TestProviderReach:
         assert f"Only {reaching} fills {where}" in str(refused.value)
 
     @pytest.mark.parametrize(
-        ("declaration", "provider"),
+        ("declaration", "names"),
         [
-            pytest.param({"kwargs": _title}, "ServiceSpec.kwargs", id="kwargs"),
+            pytest.param({"kwargs": _title}, {"title"}, id="kwargs"),
             pytest.param(
-                {"instance_selector_spec": _target(kwargs=_title)},
-                f"{TARGET}.kwargs",
-                id="target-kwargs",
+                {"instance_selector_spec": _target(kwargs=_title)}, {"pk", "title"}, id="target"
             ),
-            pytest.param({"kwargs": _title, "many": True}, "ServiceSpec.kwargs", id="many-row"),
+            pytest.param({"kwargs": _title, "many": True}, {"items"}, id="many-row"),
         ],
     )
-    def test_on_a_validator_field_when_parameters_are_assembled(
-        self, declaration: dict[str, Any], provider: str
+    def test_on_a_validator_field_a_provider_is_a_namesake(
+        self, declaration: dict[str, Any], names: set[str]
     ) -> None:
-        # Built, since the Validator's fields may need the app registry and are first read here.
+        # The field is the caller's, validated into ``data``; the keyword is the provider's.
         spec = ServiceSpec(service=print, validator=Titled(), **declaration)
+        assert spec.parameters().names() == names
+
+    @pytest.mark.parametrize(
+        "declaration",
+        [
+            pytest.param(
+                {"reads": PROJECT, "instance_selector_spec": _target(kwargs=_project)},
+                id="target-kwargs",
+            ),
+            pytest.param(
+                {
+                    "reads": PROJECT,
+                    "collection_selector_spec": SelectorSpec(
+                        kind=SelectorKind.LIST, selector=list, kwargs=_project
+                    ),
+                },
+                id="collection-kwargs",
+            ),
+        ],
+    )
+    def test_on_a_read_a_target_provider_is_a_namesake(self, declaration: dict[str, Any]) -> None:
+        assert "project" in ServiceSpec(service=print, **declaration).parameters().names()
+
+    def test_a_target_provider_on_a_shape_is_still_refused(self) -> None:
         named = (
-            f"{provider} is annotated to fill ['title'], which ServiceSpec.validator "
-            "declares, and its values never reach ServiceSpec.validator"
+            f"{TARGET}.kwargs is annotated to fill ['fields'], which ServiceSpec.shapes declares"
         )
-        with pytest.raises(ImproperlyConfigured, match=re.escape(named)) as refused:
-            spec.parameters()
-        assert "Only ServiceSpec.input_data fills ServiceSpec.validator" in str(refused.value)
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            ServiceSpec(
+                service=print, shapes=FIELDS, instance_selector_spec=_target(kwargs=_fields)
+            )
 
     def test_a_provider_filling_the_parameters_its_values_reach_is_accepted(self) -> None:
         spec = ServiceSpec(

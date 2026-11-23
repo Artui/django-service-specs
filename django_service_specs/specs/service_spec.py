@@ -412,7 +412,15 @@ class ServiceSpec(AffordanceDeclarer):
         )
         _check_reach(
             self,
-            [*_read_seats(self), _Seat("ServiceSpec.validator", own, "ServiceSpec.input_data")],
+            [
+                *_read_seats(self),
+                _Seat(
+                    "ServiceSpec.validator",
+                    own,
+                    "ServiceSpec.input_data",
+                    shared=_namesakes(self, "ServiceSpec.kwargs"),
+                ),
+            ],
         )
         if self.many:
             own = Parameters.of(_the_list(self, items=own))
@@ -564,19 +572,20 @@ def _check_shapes(spec: ServiceSpec) -> None:
 
 
 class _Seat(NamedTuple):
-    """Where parameters are declared, what declares them, and the one provider whose values reach
-    them, if any."""
+    """Where parameters are declared, what declares them, the one provider whose values reach
+    them, if any, and the providers whose key may share a name there and is no fill."""
 
     where: str
     declared: Parameters
     reaching: str | None
     callers_list: bool = False
+    shared: frozenset[str] = frozenset()
 
 
 def _read_seats(spec: ServiceSpec) -> list[_Seat]:
     """The seats known at construction: reads, the target selector's, and shapes."""
     seats: list[_Seat] = [
-        _Seat("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs"),
+        _Seat("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs", shared=_namesakes(spec)),
         _Seat("ServiceSpec.shapes", spec.shapes, None),
     ]
     if spec.many:
@@ -595,13 +604,20 @@ def _read_seats(spec: ServiceSpec) -> list[_Seat]:
     return seats
 
 
+def _namesakes(spec: ServiceSpec, *providers: str) -> frozenset[str]:
+    """``providers`` and the target selector's ``kwargs``: whose key here is a namesake, no fill."""
+    if spec.target_selector_spec() is None:
+        return frozenset(providers)
+    return frozenset((*providers, f"{_target_label(spec)}.kwargs"))
+
+
 def _target_label(spec: ServiceSpec) -> str:
     role = "instance" if spec.instance_selector_spec is not None else "collection"
     return f"ServiceSpec.{role}_selector_spec"
 
 
 def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
-    """Refuse a typed provider annotated to fill a parameter its values never reach."""
+    """Refuse a typed provider annotated to fill a parameter it never reaches and may not share."""
     target = spec.target_selector_spec()
     providers: list[tuple[str, Callable[..., Any] | None]] = [
         ("ServiceSpec.kwargs", spec.kwargs),
@@ -613,10 +629,10 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
         keys = provider_keys(provider)
         if keys is None:
             continue
-        for where, declared, reaching, callers_list in seats:
+        for where, declared, reaching, callers_list, shared in seats:
             held = keys.filled | keys.declinable if callers_list else keys.filled
             stray = sorted(held & declared.names())
-            if stray and name != reaching:
+            if stray and name != reaching and name not in shared:
                 if reaching is not None:
                     remedy = f"Only {reaching} fills {where}; fill the key there, or rename it."
                 elif callers_list:
