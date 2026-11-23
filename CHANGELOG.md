@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-11-23
+
 ### Changed
 - **A provider's key may share a name with a parameter of another seat: a namesake, not a
   fill.** A service spec's typed `kwargs` key named like a Validator field, and a target
@@ -2888,7 +2890,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.4...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
 [0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
