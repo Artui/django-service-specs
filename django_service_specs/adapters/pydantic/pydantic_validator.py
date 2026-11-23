@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Mapping
 from typing import Any, Final, get_args
 
@@ -111,10 +112,12 @@ class PydanticValidator(Validator):
     **Decoded JSON is validated as JSON**, in pydantic's JSON mode, so a
     ``strict`` model takes the JSON its declared schema describes: a list for a
     ``tuple[X, ...]``, an ISO string for a ``date`` or a ``datetime``, a value
-    for an ``Enum``, a string or a number for a ``Decimal``. Strict JSON still
-    refuses ``"3"`` or ``true`` for an ``int`` and ``3`` for a ``str``.
-    Arguments holding anything JSON cannot carry, a Python caller's ``date``
-    or ``Decimal`` say, are validated in Python mode, as pydantic would.
+    for an ``Enum``, a string or a number for a ``Decimal``, while strict JSON
+    still refuses ``3`` for a ``str``. A validator's ``info.mode`` is then
+    ``"json"``. Arguments JSON cannot carry back unchanged - a Python caller's
+    ``date`` or ``Decimal``, a tuple, a string with a lone surrogate, an
+    integer past a float's range - are validated in Python mode, as pydantic
+    would.
 
     **Time zones are pydantic's**: an offset-less date-time stays naive, where
     ``DataclassValidator`` makes it aware as Django's forms do. Declare the
@@ -198,13 +201,28 @@ class PydanticValidator(Validator):
 
 
 def _is_json(value: Any) -> bool:
-    """Whether ``value`` is decoded JSON: built only of the types Python's ``json`` decodes to."""
+    """Whether ``value`` is decoded JSON that ``json.dumps`` writes back as itself."""
     kind = type(value)
     if kind is dict:
-        return all(type(key) is str and _is_json(item) for key, item in value.items())
+        return all(
+            type(key) is str and _is_json(key) and _is_json(item) for key, item in value.items()
+        )
     if kind is list:
         return all(_is_json(item) for item in value)
-    return value is None or kind in (str, int, float, bool)
+    if kind is str:
+        return _encodes(value)
+    if kind is int:
+        return abs(value) <= sys.float_info.max
+    return value is None or kind in (float, bool)
+
+
+def _encodes(text: str) -> bool:
+    """Whether ``text`` is UTF-8: a lone surrogate, which ``json`` decodes, is not."""
+    try:
+        text.encode()
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def _parameters(fields: tuple[FieldShape, ...]) -> Parameters:

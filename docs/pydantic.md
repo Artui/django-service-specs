@@ -192,6 +192,13 @@ so a mismatch is a defect, not a refusal to report.
   value that means "not sent". An update whose fields may be left out is
   declared with the dataclass adapter's `X | UnsetType = UNSET`, as
   `AuthorPatch` is.
+- **Decoded JSON is validated as JSON**, in pydantic's JSON mode, so a
+  `strict` model takes the JSON its declared schema describes: a list for a
+  `tuple[X, ...]`, an ISO string for a `date`, a value for an `Enum`, a string
+  or a number for a `Decimal`, while strict JSON still refuses `3` for a `str`.
+  A validator's `info.mode` is `"json"`. Arguments JSON cannot write back
+  unchanged, a Python caller's `date` or `Decimal` say, are validated in Python
+  mode.
 - **Time zones are pydantic's.** An offset-less date-time stays naive, where
   the dataclass adapter makes it aware as Django's forms do. Declare the
   offset, or convert in the service.

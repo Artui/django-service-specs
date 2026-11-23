@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
+import json
 import math
 import re
 from dataclasses import dataclass
@@ -913,6 +914,13 @@ class _Strict(BaseModel):
     name: str | None = None
 
 
+class _Lax(BaseModel):
+    count: int | None = None
+    ratio: float | None = None
+    name: str | None = None
+    labels: dict[str, str] | None = None
+
+
 class _StrictFields(BaseModel):
     rows: tuple[str, ...] = Field(default=(), strict=True)
     on: Annotated[dt.date | None, Strict()] = None
@@ -938,6 +946,11 @@ class TestStrictModels:
             "count": None,
             "name": None,
         }
+
+    @pytest.mark.parametrize("beside", [{"ratio": 0.5}, {"flag": True}])
+    def test_a_float_or_a_bool_beside_a_strict_date_is_json(self, beside: dict[str, Any]) -> None:
+        values = PydanticValidator(_StrictBeside).validate({"on": "2024-06-01", **beside}, CONTEXT)
+        assert values["on"] == dt.date(2024, 6, 1)
 
     def test_a_field_declared_strict_takes_the_json_its_schema_describes(self) -> None:
         values = PydanticValidator(_StrictFields).validate(
@@ -996,3 +1009,29 @@ class _StrictScores(BaseModel):
     model_config = ConfigDict(strict=True)
 
     scores: dict[str, int]
+
+
+class _StrictBeside(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    on: dt.date
+    ratio: float | None = None
+    flag: bool | None = None
+
+
+class TestWhatJsonCannotWriteBack:
+    def test_an_integer_past_a_float_s_range_is_no_float(self) -> None:
+        with pytest.raises(InvalidArguments) as caught:
+            PydanticValidator(_Lax).validate({"ratio": 10**400}, CONTEXT)
+        assert coded(caught.value.detail) == {
+            "ratio": [("Input should be a valid number", "invalid")]
+        }
+
+    def test_an_integer_too_long_to_write_as_json_is_still_an_int(self) -> None:
+        assert PydanticValidator(_Lax).validate({"count": 10**5000}, CONTEXT)["count"] == 10**5000
+
+    @pytest.mark.parametrize("field", ["name", "labels"])
+    def test_a_lone_surrogate_json_decoded_is_taken_as_pydantic_takes_it(self, field: str) -> None:
+        text = json.loads('"a\\ud800b"')
+        sent = text if field == "name" else {text: "x"}
+        assert PydanticValidator(_Lax).validate({field: sent}, CONTEXT)[field] == sent
