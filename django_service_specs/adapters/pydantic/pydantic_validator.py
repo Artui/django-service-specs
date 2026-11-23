@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sys
 from collections.abc import Mapping
 from typing import Any, Final, get_args
 
@@ -107,6 +109,18 @@ class PydanticValidator(Validator):
     message raised with no code. A ``PydanticCustomError``'s type is the
     author's code, and is kept, as a Django ``ValidationError``'s is.
 
+    **A strict model validates decoded JSON as JSON**, in pydantic's JSON
+    mode, so it takes the JSON its declared schema describes: a list for a
+    ``tuple[X, ...]``, an ISO string for a ``date`` or a ``datetime``, a value
+    for an ``Enum``, a string or a number for a ``Decimal``, while strict JSON
+    still refuses ``3`` for a ``str``. Strict is wherever pydantic reads it:
+    the model's config, a field's ``strict=True`` or ``Strict()``, a
+    ``StrictInt``, a nested model. A validator's ``info.mode`` is then
+    ``"json"``. Arguments JSON cannot write back unchanged - a Python caller's
+    ``date`` or ``Decimal``, a tuple, a string with a lone surrogate, an
+    integer past a float's range - are validated in Python mode, as is every
+    call to a model that declares nothing strict.
+
     **Time zones are pydantic's**: an offset-less date-time stays naive, where
     ``DataclassValidator`` makes it aware as Django's forms do. Declare the
     offset, or convert in the service.
@@ -123,6 +137,7 @@ class PydanticValidator(Validator):
         check_model(model, label="PydanticValidator")
         self.model = model
         self._fields = read_fields(model)
+        self._strict = _declares_strict(model.__pydantic_core_schema__)
         self._parameters = _parameters(self._fields)
 
     def parameters(self) -> Parameters:
@@ -171,19 +186,55 @@ class PydanticValidator(Validator):
                 "a pydantic model validates every field. Drop partial and give each field an "
                 "update may leave out a default, or validate with a FormValidator."
             )
+        data = dict(arguments)
+        shared = {
+            "principal": context.principal,
+            "target": context.target,
+            "call_context": context.call_context,
+        }
         try:
-            instance = self.model.model_validate(
-                dict(arguments),
-                context={
-                    "principal": context.principal,
-                    "target": context.target,
-                    "call_context": context.call_context,
-                },
-            )
+            if self._strict and _is_json(data):
+                instance = self.model.model_validate_json(json.dumps(data), context=shared)
+            else:
+                instance = self.model.model_validate(data, context=shared)
         except ValidationError as exc:
             raise InvalidArguments(_detail(self.model, self._fields, exc)) from exc
         values = {fs.name: getattr(instance, fs.name) for fs in inputs(self._fields)}
         return Validated(values=values, data=instance)
+
+
+def _declares_strict(schema: Any) -> bool:
+    """Whether the core schema sets ``strict`` anywhere: config, field, type or nested model."""
+    if isinstance(schema, dict):
+        return schema.get("strict") is True or any(map(_declares_strict, schema.values()))
+    if isinstance(schema, list):
+        return any(map(_declares_strict, schema))
+    return False
+
+
+def _is_json(value: Any) -> bool:
+    """Whether ``value`` is decoded JSON that ``json.dumps`` writes back as itself."""
+    kind = type(value)
+    if kind is dict:
+        return all(
+            type(key) is str and _is_json(key) and _is_json(item) for key, item in value.items()
+        )
+    if kind is list:
+        return all(_is_json(item) for item in value)
+    if kind is str:
+        return _encodes(value)
+    if kind is int:
+        return abs(value) <= sys.float_info.max
+    return value is None or kind in (float, bool)
+
+
+def _encodes(text: str) -> bool:
+    """Whether ``text`` is UTF-8: a lone surrogate, which ``json`` decodes, is not."""
+    try:
+        text.encode()
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def _parameters(fields: tuple[FieldShape, ...]) -> Parameters:

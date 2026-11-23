@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.4] — 2026-11-23
+
+### Fixed
+- **A `strict` pydantic model behind `PydanticValidator` takes the JSON its declared schema
+  describes.** Decoded arguments were validated in pydantic's Python mode, where strict
+  refuses a list for a `tuple[X, ...]`, an ISO string for a `date` or `datetime`, a value
+  for an `Enum` and a string or number for a `Decimal`, so every JSON call matching the
+  schema was refused. A model that declares strict anywhere, in its config, on a field
+  (`strict=True`, `Strict()`, `StrictInt`) or in a nested model, now validates decoded JSON
+  in pydantic's JSON mode, which takes each of these and still refuses what strict JSON
+  refuses, `3` for a `str` among them (the shape check still reads an integer's `"3"` as
+  3 first); a validator there reads `info.mode` as `"json"`. Arguments JSON cannot write
+  back unchanged, a Python caller's `date` or `Decimal`, a tuple, a string with a lone
+  surrogate or an integer past a float's range, are validated in Python mode as before. A
+  model that declares nothing strict is validated as it was.
+
 ## [0.34.3] — 2026-11-23
 
 ### Fixed
@@ -2849,7 +2865,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.3...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.4...HEAD
+[0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/Artui/django-service-specs/compare/v0.34.0...v0.34.1
