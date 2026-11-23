@@ -29,6 +29,9 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import coded_messages
+from django_service_specs.schema.fragment_keywords import fragment_keywords
+from django_service_specs.schema.registered_fragment import registered_fragment
+from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -393,6 +396,24 @@ class FormValidator(Validator):
     ``cleaned_data``, the key cleaned to its row, or ``None`` for a new one.
     A form field named as one of these additions is refused.
 
+    **A field type can be declared by a rule.** Before its own table, the
+    adapter asks
+    [`registered_fragment`][django_service_specs.schema.registered_fragment.registered_fragment]
+    for the field's class: the rules of ``json_schema_registry``, through the
+    class's MRO, then the project's, which the
+    ``SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`` setting names, unless
+    ``project_registry=False``. A rule's fragment is the parameter's type, read
+    by [`fragment_keywords`][django_service_specs.schema.fragment_keywords.fragment_keywords],
+    with ``required`` the field's, ``nullable`` when the field is optional or
+    the fragment says so, and ``help`` the field's ``help_text`` or the
+    fragment's ``description``; so a ``forms.IntegerField`` subclass whose
+    ``to_python`` keeps a string is a ``"string"`` parameter, and the shape check
+    passes a string to it. The rules are read on every ``parameters()``, so
+    ``override_settings`` reaches a validator built before it. Construction
+    reads them only for a field the table cannot declare, which is refused
+    unless a rule declares it. A field the adapter refuses outright, a ``JSONField``,
+    ``MultiValueField`` or ``ComboField``, stays refused whatever the rules say.
+
     A refusal is one
     [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
     carrying the form's own errors and messages, ``{field: [messages]}``, with
@@ -408,6 +429,8 @@ class FormValidator(Validator):
         form_kwargs: Callable[..., Mapping[str, Any]] | None = None,
         *,
         formset_class: type[forms.BaseFormSet] | None = None,
+        json_schema_registry: JsonSchemaRegistry | None = None,
+        project_registry: bool = True,
     ) -> None:
         # Refuses anything but a form class at construction.
         if not (isinstance(form_class, type) and issubclass(form_class, forms.BaseForm)):
@@ -422,18 +445,20 @@ class FormValidator(Validator):
         _check_model(form_class)
         self.form_class = form_class
         self.form_kwargs = form_kwargs
+        self.json_schema_registry = json_schema_registry
+        self.project_registry = project_registry
         fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]
         self._names: frozenset[str] = frozenset(fields)
-        self._declared: tuple[tuple[Parameter, forms.Field], ...] = tuple(
-            (_parameter(form_class, name, field), field)
-            for name, field in fields.items()
-            if not field.disabled
-        )
+        self._declared: dict[str, forms.Field] = {
+            name: field for name, field in fields.items() if not field.disabled
+        }
+        for name, field in self._declared.items():
+            self._check_declarable(name, field)
         self._takes_instance = _declares_instance(form_class)
         self._clears: dict[str, str] = {
-            parameter.name: clear
-            for parameter, field in self._declared
-            if (clear := _clear_checkbox(form_class, parameter.name, field)) is not None
+            name: clear
+            for name, field in self._declared.items()
+            if (clear := _clear_checkbox(form_class, name, field)) is not None
         }
         self.formset_class = formset_class
         self._added = _formset_parameters(form_class, formset_class)
@@ -443,12 +468,43 @@ class FormValidator(Validator):
     def parameters(self) -> Parameters:
         """The form's class-level fields, in declaration order, as Parameters."""
         declared: list[Parameter] = []
-        for parameter, field in self._declared:
-            declared.append(dataclasses.replace(parameter, help=str(field.help_text) or None))
-            clear = self._clears.get(parameter.name)
+        for name, field in self._declared.items():
+            declared.append(self._parameter(name, field))
+            clear = self._clears.get(name)
             if clear is not None:
                 declared.append(Parameter(clear, "boolean"))
         return Parameters((*declared, *self._added))
+
+    def _check_declarable(self, name: str, field: forms.Field) -> None:
+        """Refuse a field the table cannot declare, reading the rules only for such a field."""
+        where = f"{self.form_class.__qualname__}.{name}"
+        _check_refused(field, where=where)
+        try:
+            _parameter(name, field, where=where)
+        except ImproperlyConfigured:
+            fragment = registered_fragment(
+                type(field), self.json_schema_registry, project_registry=self.project_registry
+            )
+            if fragment is None:
+                raise
+
+    def _parameter(self, name: str, field: forms.Field) -> Parameter:
+        """One field as a Parameter, its type a registered rule's where one names its class."""
+        where = f"{self.form_class.__qualname__}.{name}"
+        _check_refused(field, where=where)
+        help_text = str(field.help_text) or None
+        fragment = registered_fragment(
+            type(field), self.json_schema_registry, project_registry=self.project_registry
+        )
+        if fragment is None:
+            return dataclasses.replace(_parameter(name, field, where=where), help=help_text)
+        declared = fragment_keywords(fragment)
+        declared.update(
+            required=field.required,
+            nullable=not field.required or declared.get("nullable", False),
+            help=help_text or declared.get("help"),
+        )
+        return Parameter(name, declared.pop("type"), **declared)
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
         """The form's ``cleaned_data``, or ``InvalidArguments`` carrying its errors.
@@ -558,11 +614,10 @@ class FormValidator(Validator):
         self, arguments: Mapping[str, Any]
     ) -> tuple[dict[str, list[str]], MultiValueDict[str, Any]]:
         """One row's arguments as a post's strings and its files, keyed by field name."""
-        fields = {parameter.name: field for parameter, field in self._declared}
         data: dict[str, list[str]] = {}
         files: MultiValueDict[str, Any] = MultiValueDict()
         for name, value in arguments.items():
-            field = fields.get(name)
+            field = self._declared.get(name)
             if isinstance(field, forms.FileField):
                 files[name] = value
             elif value is not None:
@@ -581,7 +636,7 @@ class FormValidator(Validator):
         keys = self.form_class.__new__(self.form_class)
         keys.prefix = prefix
         clears = {clear: name for name, clear in self._clears.items()}
-        widgets = {parameter.name: field.widget for parameter, field in self._declared}
+        widgets = {name: field.widget for name, field in self._declared.items()}
 
         def key(name: str) -> str:
             field_name = clears.get(name)
@@ -800,12 +855,15 @@ def _check_model(form_class: type[forms.BaseForm]) -> None:
         )
 
 
-def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) -> Parameter:
-    """One field as a Parameter, ``help`` aside, or ``ImproperlyConfigured`` naming it."""
-    where = f"{form_class.__qualname__}.{name}"
+def _check_refused(field: forms.Field, *, where: str) -> None:
+    """Refuse a field a JSON wire cannot carry, whatever the rules say."""
     for refused, reason in _REFUSED:
         if isinstance(field, refused):
             raise ImproperlyConfigured(f"{where}: a {type(field).__name__} {reason}.")
+
+
+def _parameter(name: str, field: forms.Field, *, where: str) -> Parameter:
+    """One field as a Parameter by the adapter's own table, ``help`` aside."""
     if isinstance(field, forms.FileField):
         return Parameter(name, "file", required=field.required, nullable=not field.required)
     if isinstance(field, forms.NullBooleanField):

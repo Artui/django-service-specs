@@ -7,6 +7,7 @@ from django_service_specs.types.file_result import FileResult
 from django_service_specs.types.file_too_large import FileTooLarge
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.is_supplied import is_supplied
+from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
@@ -35,6 +36,7 @@ __all__ = [
     "FieldAudience",
     "FileResult",
     "FileTooLarge",
+    "JsonSchemaRegistry",
     "NoInput",
     "OutputPage",
     "ProgressReporter",

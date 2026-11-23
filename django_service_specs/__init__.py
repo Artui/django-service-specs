@@ -122,8 +122,10 @@ from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.file_output import file_output
+from django_service_specs.schema.fragment_keywords import fragment_keywords
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.parameters_schema import parameters_schema
+from django_service_specs.schema.registered_fragment import registered_fragment
 from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
@@ -165,6 +167,7 @@ from django_service_specs.types.file_result import FileResult
 from django_service_specs.types.file_too_large import FileTooLarge
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.is_supplied import is_supplied
+from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
@@ -226,6 +229,7 @@ __all__ = [
     "FilePresenter",
     "FileResult",
     "FileTooLarge",
+    "JsonSchemaRegistry",
     "FormValidator",
     "ForwardRelationSpec",
     "GenericRelationSpec",
@@ -334,6 +338,7 @@ __all__ = [
     "filter_set_parameters",
     "flat_arguments",
     "form_keywords",
+    "fragment_keywords",
     "implements",
     "is_async",
     "is_deactivated",
@@ -355,6 +360,7 @@ __all__ = [
     "provider_reached",
     "refusal_messages",
     "register_row_error",
+    "registered_fragment",
     "relax_partial",
     "resolve_callable_kwargs",
     "resolve_principal",

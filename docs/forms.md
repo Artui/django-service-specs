@@ -170,7 +170,33 @@ Refused, with `ImproperlyConfigured`:
 - `ComboField`: it has no JSON type of its own.
 - A `ModelChoiceField` with no queryset, since there is no model to read its
   key from, or one matching rows on a model field with no JSON type.
-- Any field class the table does not cover, a project's own included.
+- Any field class the table does not cover, a project's own included, unless
+  a [field schema rule](#a-field-type-of-the-projects-own) declares it.
+
+### A field type of the project's own
+
+The table's answer for a project's field class can be replaced by a rule: a
+[`JsonSchemaRegistry`][django_service_specs.types.json_schema_registry.JsonSchemaRegistry]
+handed to the validator, or the project's, which the
+`SERVICE_SPECS_FIELD_SCHEMA_REGISTRY` setting names. The adapter reads them
+before the table, so a rule overrides a row as well as adding one:
+
+```python
+--8<--
+docs/examples/forms_adapter.py:field_rules
+--8<--
+```
+
+`code` is a `string` parameter, so `{"code": "AB-12"}` passes the shape check
+and the form cleans it. The field still states `required`, and its
+`help_text` wins over the fragment's `description`; an optional field is
+nullable, as every optional field is here. The validator's own rules answer
+first and the project's the rest; `project_registry=False` reads only its own.
+The rules are read on every `parameters()`; construction reads them only for a
+field the table cannot declare, which is refused unless a rule declares it. A `JSONField`,
+`MultiValueField` or `ComboField` stays refused whatever the rules say. See
+[field schema rules](schema.md#field-schema-rules) for the order the rules
+are read in.
 
 ## Presence, null and defaults
 
