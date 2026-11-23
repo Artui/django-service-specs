@@ -25,6 +25,7 @@ from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
+from django_service_specs.adapters.forms import form_validator as form_validator_module
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
@@ -3062,6 +3063,28 @@ class TestAFieldTypeCanBeDeclaredByARule:
         )
         assert (other.required, other.nullable, other.help) == (True, True, "A code.")
         assert other.json_schema_extra == {"pattern": "^A"}
+
+    def test_an_optional_field_a_rule_types_is_nullable(self) -> None:
+        form_class = type("Coded", (forms.Form,), {"code": LooseIntegerField(required=False)})
+        rules = _rules((LooseIntegerField, {"type": "string"}))
+        code = _of(FormValidator(form_class, json_schema_registry=rules).parameters(), "code")
+        assert (code.type, code.required, code.nullable) == ("string", False, True)
+
+    def test_the_table_builds_a_field_s_parameter_once_not_per_call(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        built: list[str] = []
+        real = form_validator_module._parameter
+
+        def counting(name: str, field: forms.Field, *, where: str) -> Parameter:
+            built.append(name)
+            return real(name, field, where=where)
+
+        monkeypatch.setattr(form_validator_module, "_parameter", counting)
+        validator = FormValidator(_Order)
+        for _ in range(3):
+            validator.parameters()
+        assert built == ["code"]
 
     def test_a_field_the_table_has_no_row_for_is_declared_by_a_rule(self) -> None:
         form_class = type("Located", (forms.Form,), {"at": Point()})
