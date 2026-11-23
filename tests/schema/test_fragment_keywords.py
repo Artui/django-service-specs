@@ -20,11 +20,13 @@ from django_service_specs.schema.fragment_keywords import fragment_keywords
         ({"type": "decimal"}, {"type": "any"}),
         ({"enum": [1, 2]}, {"type": "integer", "choices": (1, 2)}),
         ({"enum": [1, "a"]}, {"type": "any"}),
+        ({"type": "number", "enum": [1, 2]}, {"type": "number", "choices": (1, 2)}),
         ({"type": "string", "format": "date"}, {"type": "string", "format": "date"}),
         ({"type": "string", "format": "money"}, {"type": "string"}),
         ({"type": "array", "items": {"type": "integer"}}, {"type": "array", "items": "integer"}),
         ({"type": "array", "items": {"type": "integer", "minimum": 0}}, {"type": "array"}),
         ({"type": "array", "items": {"type": "money"}}, {"type": "array"}),
+        ({"type": "array", "items": {"type": ["string", "null"]}}, {"type": "array"}),
         (
             {"type": "integer", "minimum": 1, "maximum": 9},
             {"type": "integer", "minimum": 1, "maximum": 9},
