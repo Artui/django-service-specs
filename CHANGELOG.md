@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.4] — 2026-11-23
+
 ### Fixed
 - **A `strict` pydantic model behind `PydanticValidator` takes the JSON its declared schema
   describes.** Decoded arguments were validated in pydantic's Python mode, where strict
@@ -2865,7 +2867,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.3...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.4...HEAD
+[0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
 [0.34.1]: https://github.com/Artui/django-service-specs/compare/v0.34.0...v0.34.1
