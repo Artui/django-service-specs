@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Field schema rules, for a seat and for the project.** `JsonSchemaRegistry` maps a field
+  class to the JSON Schema fragment it is declared as, matched through the class's MRO so the
+  most specific class wins, and imports neither Django's forms nor DRF.
+  `SERVICE_SPECS_FIELD_SCHEMA_REGISTRY` names the project's registry by dotted path, read at
+  the call, so `override_settings` reaches a spec built before it.
+  `registered_fragment(field_type, registry, *, project_registry=True)` answers a class from
+  a seat's own registry first and the project's second; `project_registry=False` opts a seat
+  out, and an empty seat registry adds nothing and still reads the project's.
+  `fragment_keywords` turns a fragment into a `Parameter`'s or an `OutputField`'s keywords,
+  keeping what the declaration can state.
+- **`FormValidator` reads the rules before its table**, with `json_schema_registry=` and
+  `project_registry=`: a `forms.IntegerField` subclass that keeps a string can be declared a
+  `string`, so the shape check passes the string to the field. A field class the table has no
+  row for is declared by a rule. The parameters are built on every `parameters()` call rather
+  than once at construction.
+
 ## [0.35.0] — 2026-11-23
 
 ### Changed
