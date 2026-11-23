@@ -11,13 +11,14 @@ _Rule = tuple[type, dict[str, Any]]
 class JsonSchemaRegistry:
     """Rules mapping a field type to the JSON Schema fragment it is declared as.
 
-    A seat that walks fields - the kernel's
-    [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator],
-    and the serializer seats of django-spec-rest - asks
+    The kernel's
+    [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
+    asks
     [`registered_fragment`][django_service_specs.schema.registered_fragment.registered_fragment]
-    for a field's type before its own table, so a rule both describes a type the
-    seat has no mapping for and overrides one it has: a ``forms.IntegerField``
-    subclass that reads strings is declared a string.
+    for a field's type before its own table, and any seat that walks fields can do
+    the same, so a rule both describes a type the seat has no mapping for and
+    overrides one it has: a ``forms.IntegerField`` subclass that reads strings is
+    declared a string.
 
     A field is matched through its class's MRO, so the most specific class with a
     rule wins whatever the order the rules are listed in; two rules for one class

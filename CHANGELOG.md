@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key named like a field already does. A capture naming neither is the edge's to drop or
   refuse. A capture naming a `many` spec's list is refused, and so is an edge's `mapped`
   rename of a capture onto a Validator field, naming both. Names only, no resolver or
-  converter, so django-spec-rest and django-spec-html split their captures by one rule.
+  converter: the rule an HTTP edge splits its captures by.
 - **Field schema rules, for a seat and for the project.** `JsonSchemaRegistry` maps a field
   class to the JSON Schema fragment it is declared as, matched through the class's MRO so the
   most specific class wins, and imports neither Django's forms nor DRF.

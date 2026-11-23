@@ -29,7 +29,7 @@ ships an HTTP view.
 A URL converter hands a view its `to_python()` value, while a Validator field
 reads what the caller sent, so a capture named like a field cannot fill it: a
 converter that changes the value (a hashid, say) would hand the field `42` where
-it reads `"h42"`. Every HTTP edge splits a route's captures by one rule,
+it reads `"h42"`. The rule an HTTP edge splits a route's captures by is
 [`route_captures`][django_service_specs.specs.route_captures.route_captures]:
 
 ```python

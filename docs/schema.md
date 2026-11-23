@@ -435,7 +435,7 @@ project's setting, it types the field for every seat:
 SERVICE_SPECS_FIELD_SCHEMA_REGISTRY = "docs.examples.forms_adapter.RULES"
 ```
 
-With that setting, every seat walking fields declares a `LooseIntegerField` a
+With that setting, `FormValidator` declares a `LooseIntegerField` a
 `string`, and a JSON `"AB-12"` reaches the field. The rules are answered in
 this order:
 
@@ -458,8 +458,8 @@ a format the kernel names, an `enum` as choices, bounds, a `description` as
 help) is kept, and a keyword no parameter spells is its `json_schema_extra`.
 A rule naming a JSON type the kernel does not have is declared `any`, and a
 format the kernel has no name for is dropped. The registry imports neither
-Django's forms nor DRF: a rule names any class, so django-spec-rest's
-serializer seats read the same rules.
+Django's forms nor DRF: a rule names any class, so a seat that walks
+other kinds of field reads the same rules through `registered_fragment`.
 
 ## What a spec returns
 
