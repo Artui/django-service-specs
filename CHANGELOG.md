@@ -26,14 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `registered_fragment(field_type, registry, *, project_registry=True)` answers a class by
   the most specific class in its MRO with a rule in either registry, a seat's own rule
   answering a class both name, so a project's rule for its own field class wins over a seat's
-  rule for a base; `project_registry=False` opts a seat out, and an empty seat registry adds nothing and still reads the project's.
+  rule for a base; `project_registry=False` opts a seat out, and an empty seat registry adds
+  nothing and still reads the project's.
   `fragment_keywords` turns a fragment into a `Parameter`'s or an `OutputField`'s keywords,
   keeping what the declaration can state.
 - **`FormValidator` reads the rules before its table**, with `json_schema_registry=` and
   `project_registry=`: a `forms.IntegerField` subclass that keeps a string can be declared a
   `string`, so the shape check passes the string to the field. A field class the table has no
-  row for is declared by a rule. The parameters are built on every `parameters()` call rather
-  than once at construction.
+  row for is declared by a rule. A table-declared field's parameter is built once at
+  construction; the rules and its `help` are read on every `parameters()` call.
 
 ### Fixed
 - **A lazy row, such as `request.user`, is written and answers row conditions.**

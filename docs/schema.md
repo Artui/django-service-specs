@@ -429,7 +429,7 @@ docs/examples/forms_adapter.py:field_rules
 ```
 
 Handed to the validator, `RULES` types that one seat's field. Named by the
-project's setting, it types the field for every seat:
+project's setting, it types the field for every `FormValidator`:
 
 ```python
 SERVICE_SPECS_FIELD_SCHEMA_REGISTRY = "docs.examples.forms_adapter.RULES"

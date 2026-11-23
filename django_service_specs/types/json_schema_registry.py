@@ -33,7 +33,7 @@ class JsonSchemaRegistry:
         )
         validator = FormValidator(OrderForm, json_schema_registry=registry)
 
-    A seat's registry sits in front of the project's, which the
+    A seat's registry is read beside the project's, which the
     ``SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`` setting names; see
     [field schema rules](schema.md#field-schema-rules).
 

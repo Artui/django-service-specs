@@ -25,8 +25,8 @@ output format is `SPEC_CLI_OUTPUT`, read by
   bounds a query string's lists by the same key.
 - **`SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`**: the dotted path to a
   [`JsonSchemaRegistry`][django_service_specs.types.json_schema_registry.JsonSchemaRegistry],
-  the project's field schema rules, which a seat walking fields reads behind its
-  own. Unset, there are none. A value that is no string, a path that does not
+  the project's field schema rules, read beside a seat's own, the most specific
+  class winning. Unset, there are none. A value that is no string, a path that does not
   import, or one naming anything but a registry is refused as
   `ImproperlyConfigured` where it is read. See
   [field schema rules](schema.md#field-schema-rules).
