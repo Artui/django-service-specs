@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any, Final, get_args
 
@@ -107,6 +108,14 @@ class PydanticValidator(Validator):
     message raised with no code. A ``PydanticCustomError``'s type is the
     author's code, and is kept, as a Django ``ValidationError``'s is.
 
+    **Decoded JSON is validated as JSON**, in pydantic's JSON mode, so a
+    ``strict`` model takes the JSON its declared schema describes: a list for a
+    ``tuple[X, ...]``, an ISO string for a ``date`` or a ``datetime``, a value
+    for an ``Enum``, a string or a number for a ``Decimal``. Strict JSON still
+    refuses ``"3"`` or ``true`` for an ``int`` and ``3`` for a ``str``.
+    Arguments holding anything JSON cannot carry, a Python caller's ``date``
+    or ``Decimal`` say, are validated in Python mode, as pydantic would.
+
     **Time zones are pydantic's**: an offset-less date-time stays naive, where
     ``DataclassValidator`` makes it aware as Django's forms do. Declare the
     offset, or convert in the service.
@@ -171,19 +180,31 @@ class PydanticValidator(Validator):
                 "a pydantic model validates every field. Drop partial and give each field an "
                 "update may leave out a default, or validate with a FormValidator."
             )
+        data = dict(arguments)
+        shared = {
+            "principal": context.principal,
+            "target": context.target,
+            "call_context": context.call_context,
+        }
         try:
-            instance = self.model.model_validate(
-                dict(arguments),
-                context={
-                    "principal": context.principal,
-                    "target": context.target,
-                    "call_context": context.call_context,
-                },
-            )
+            if _is_json(data):
+                instance = self.model.model_validate_json(json.dumps(data), context=shared)
+            else:
+                instance = self.model.model_validate(data, context=shared)
         except ValidationError as exc:
             raise InvalidArguments(_detail(self.model, self._fields, exc)) from exc
         values = {fs.name: getattr(instance, fs.name) for fs in inputs(self._fields)}
         return Validated(values=values, data=instance)
+
+
+def _is_json(value: Any) -> bool:
+    """Whether ``value`` is decoded JSON: built only of the types Python's ``json`` decodes to."""
+    kind = type(value)
+    if kind is dict:
+        return all(type(key) is str and _is_json(item) for key, item in value.items())
+    if kind is list:
+        return all(_is_json(item) for item in value)
+    return value is None or kind in (str, int, float, bool)
 
 
 def _parameters(fields: tuple[FieldShape, ...]) -> Parameters:

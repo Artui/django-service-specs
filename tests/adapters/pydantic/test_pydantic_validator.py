@@ -17,6 +17,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    Strict,
     ValidationInfo,
     computed_field,
     conlist,
@@ -307,7 +308,7 @@ class TestRefusals:
         assert detail == {
             "ranges": {
                 1: {NON_FIELD_ERRORS: [RANGE_REFUSED]},
-                2: {NON_FIELD_ERRORS: ["Input should be a valid dictionary or instance of Range"]},
+                2: {NON_FIELD_ERRORS: ["Input should be an object"]},
             }
         }
 
@@ -892,3 +893,106 @@ def test_a_tuple_inside_a_default_is_declared_as_a_list() -> None:
     nested = PydanticValidator(_Nested).parameters()
     assert nested == PydanticValidator(_NestedAsLists).parameters()
     assert [p.default for p in nested] == [[[1, 2]], {"a": [3]}]
+
+
+class _StrictRow(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    sku: str
+    quantity: int
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    rows: tuple[_StrictRow, ...] = ()
+    on: dt.date | None = None
+    priority: Priority | None = None
+    price: Decimal | None = None
+    count: int | None = None
+    name: str | None = None
+
+
+class _StrictFields(BaseModel):
+    rows: tuple[str, ...] = Field(default=(), strict=True)
+    on: Annotated[dt.date | None, Strict()] = None
+    days: list[dt.date] = Field(default=[], strict=True)
+
+
+class TestStrictModels:
+    def test_a_strict_model_takes_the_json_call_its_declared_schema_describes(self) -> None:
+        validator = PydanticValidator(_Strict)
+        arguments = {
+            "rows": [{"sku": "A-1", "quantity": 2}],
+            "on": "2024-06-01",
+            "priority": Priority.HIGH.value,
+            "price": "12.50",
+            "name": None,
+        }
+        checked = check_arguments(validator.parameters(), arguments)
+        assert validator.validate(checked, CONTEXT) == {
+            "rows": (_StrictRow(sku="A-1", quantity=2),),
+            "on": dt.date(2024, 6, 1),
+            "priority": Priority.HIGH,
+            "price": Decimal("12.50"),
+            "count": None,
+            "name": None,
+        }
+
+    def test_a_field_declared_strict_takes_the_json_its_schema_describes(self) -> None:
+        values = PydanticValidator(_StrictFields).validate(
+            {"rows": ["a", "b"], "on": "2024-06-01"}, CONTEXT
+        )
+        assert values == {"rows": ("a", "b"), "on": dt.date(2024, 6, 1), "days": []}
+
+    @pytest.mark.parametrize(
+        ("arguments", "refused"),
+        [
+            ({"count": "3"}, {"count": [("Input should be a valid integer", "invalid")]}),
+            ({"count": True}, {"count": [("Input should be a valid integer", "invalid")]}),
+            ({"name": 3}, {"name": [("Input should be a valid string", "invalid")]}),
+            (
+                {"rows": [{"sku": "A-1", "quantity": "2"}]},
+                {"rows": {0: {"quantity": [("Input should be a valid integer", "invalid")]}}},
+            ),
+        ],
+    )
+    def test_a_strict_model_still_refuses_what_strict_json_refuses(
+        self, arguments: dict[str, Any], refused: dict[str, Any]
+    ) -> None:
+        with pytest.raises(InvalidArguments) as caught:
+            PydanticValidator(_Strict).validate(arguments, CONTEXT)
+        assert coded(caught.value.detail) == refused
+
+    def test_python_values_json_cannot_carry_are_validated_in_python_mode(self) -> None:
+        validator = PydanticValidator(_Strict)
+        values = validator.validate({"on": dt.date(2024, 6, 1), "price": Decimal("1.5")}, CONTEXT)
+        assert (values["on"], values["price"]) == (dt.date(2024, 6, 1), Decimal("1.5"))
+        with pytest.raises(InvalidArguments) as caught:
+            validator.validate({"on": dt.date(2024, 6, 1), "rows": []}, CONTEXT)
+        assert coded(caught.value.detail) == {
+            "rows": [("Input should be a valid tuple", "invalid")]
+        }
+
+    def test_a_list_holding_a_python_value_is_validated_in_python_mode(self) -> None:
+        validator = PydanticValidator(_StrictFields)
+        days = [dt.date(2024, 6, 1)]
+        assert validator.validate({"days": days}, CONTEXT)["days"] == days
+        with pytest.raises(InvalidArguments) as caught:
+            validator.validate({"days": ("2024-06-01",)}, CONTEXT)
+        assert coded(caught.value.detail) == {
+            "days": [("Input should be a valid list", "not_a_list")]
+        }
+
+    def test_a_map_keyed_by_anything_but_strings_is_not_json(self) -> None:
+        with pytest.raises(InvalidArguments) as caught:
+            PydanticValidator(_StrictScores).validate({"scores": {1: 2}}, CONTEXT)
+        assert coded(caught.value.detail) == {
+            "scores": {1: {"[key]": [("Input should be a valid string", "invalid")]}}
+        }
+
+
+class _StrictScores(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    scores: dict[str, int]

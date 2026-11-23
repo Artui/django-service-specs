@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A `strict` pydantic model behind `PydanticValidator` takes the JSON its declared schema
+  describes.** Decoded arguments were validated in pydantic's Python mode, where strict
+  refuses a list for a `tuple[X, ...]`, an ISO string for a `date` or `datetime`, a value
+  for an `Enum` and a string or number for a `Decimal`, so every JSON call matching the
+  schema was refused, whether the model or the field was strict. Arguments built only of
+  what Python's `json` decodes to are now validated in pydantic's JSON mode, which takes
+  each of these under strict and still refuses `"3"` or `true` for an `int` and `3` for a
+  `str`; arguments holding anything else, a Python caller's `date` or `Decimal`, are
+  validated in Python mode as before. A non-strict model's results are unchanged, apart
+  from the words for a row that is not an object, now pydantic's JSON "Input should be an
+  object".
+
 ## [0.34.3] — 2026-11-23
 
 ### Fixed
