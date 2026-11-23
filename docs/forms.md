@@ -182,21 +182,9 @@ handed to the validator, or the project's, which the
 before the table, so a rule overrides a row as well as adding one:
 
 ```python
-from django import forms
-from django_service_specs import FormValidator, JsonSchemaRegistry
-
-
-class LooseIntegerField(forms.IntegerField):
-    def to_python(self, value):
-        return value
-
-
-class OrderForm(forms.Form):
-    code = LooseIntegerField()
-
-
-rules = JsonSchemaRegistry(fields=((LooseIntegerField, {"type": "string"}),))
-validator = FormValidator(OrderForm, json_schema_registry=rules)
+--8<--
+docs/examples/forms_adapter.py:field_rules
+--8<--
 ```
 
 `code` is a `string` parameter, so `{"code": "AB-12"}` passes the shape check
@@ -204,8 +192,8 @@ and the form cleans it. The field still states `required`, and its
 `help_text` wins over the fragment's `description`; an optional field is
 nullable, as every optional field is here. The validator's own rules answer
 first and the project's the rest; `project_registry=False` reads only its own.
-The rules are read on every `parameters()`, and once at construction, where a
-field neither a rule nor the table declares is refused. A `JSONField`,
+The rules are read on every `parameters()`; construction reads them only for a
+field the table cannot declare, which is refused unless a rule declares it. A `JSONField`,
 `MultiValueField` or `ComboField` stays refused whatever the rules say. See
 [field schema rules](schema.md#field-schema-rules) for the order the rules
 are read in.

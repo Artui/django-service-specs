@@ -423,17 +423,16 @@ for a field's class before its own table, so a rule both declares a class the
 table has no row for and overrides one it has.
 
 ```python
-# myproject/schema_rules.py
-from django_service_specs import JsonSchemaRegistry
-
-from myproject.fields import LooseIntegerField
-
-RULES = JsonSchemaRegistry(fields=((LooseIntegerField, {"type": "string"}),))
+--8<--
+docs/examples/forms_adapter.py:field_rules
+--8<--
 ```
 
+Handed to the validator, `RULES` types that one seat's field. Named by the
+project's setting, it types the field for every seat:
+
 ```python
-# settings.py
-SERVICE_SPECS_FIELD_SCHEMA_REGISTRY = "myproject.schema_rules.RULES"
+SERVICE_SPECS_FIELD_SCHEMA_REGISTRY = "docs.examples.forms_adapter.RULES"
 ```
 
 With that setting, every seat walking fields declares a `LooseIntegerField` a

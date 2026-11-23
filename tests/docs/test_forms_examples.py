@@ -6,8 +6,10 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 
 from django_service_specs import (
+    FormValidator,
     InvalidArguments,
     NotPermitted,
     Output,
@@ -240,3 +242,22 @@ class TestFormset:
         rows = [{"title": "A"}, {"title": "B"}]
         result = dispatch(forms_adapter.add_lines_spec, principal=None, arguments={"items": rows})
         assert result.value == rows
+
+
+class TestFieldRules:
+    def test_the_seat_s_rule_declares_the_code_a_string(self) -> None:
+        schema = parameters_schema(forms_adapter.order_validator.parameters())
+        assert schema["properties"]["code"] == {"type": "string"}
+
+    def test_the_string_reaches_the_form(self) -> None:
+        validator = forms_adapter.order_validator
+        assert validator.validate({"code": "AB-12"}, CONTEXT) == {"code": "AB-12"}
+
+    def test_named_by_the_setting_the_rules_type_a_seat_with_none(self) -> None:
+        validator = FormValidator(forms_adapter.OrderForm)
+        assert parameters_schema(validator.parameters())["properties"]["code"]["type"] == "integer"
+        with override_settings(
+            SERVICE_SPECS_FIELD_SCHEMA_REGISTRY="docs.examples.forms_adapter.RULES"
+        ):
+            schema = parameters_schema(validator.parameters())
+        assert schema["properties"]["code"] == {"type": "string"}

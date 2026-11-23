@@ -3071,6 +3071,13 @@ class TestAFieldTypeCanBeDeclaredByARule:
         with pytest.raises(ImproperlyConfigured, match=r"Located\.at: a Point is not a field"):
             validator.parameters()
 
+    def test_construction_reads_no_rule_for_a_field_the_table_declares(self) -> None:
+        # A setting that would be refused where it is read: construction never reads it.
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=7):
+            validator = FormValidator(Everything)
+            with pytest.raises(ImproperlyConfigured, match="SERVICE_SPECS_FIELD_SCHEMA_REGISTRY"):
+                validator.parameters()
+
     def test_a_field_the_table_has_no_row_for_is_refused_with_no_rule(self) -> None:
         form_class = type("Located", (forms.Form,), {"at": Point()})
         with pytest.raises(ImproperlyConfigured, match=r"Located\.at: a Point is not a field"):

@@ -23,8 +23,18 @@ def registered_fragment(
     own and still reads the project's. ``None`` leaves the field to the seat's
     own table. The fragment is a copy, the caller's to change.
     """
-    fragment = None if registry is None else registry.fragment(field_type)
+    fragment = _rule(registry, field_type)
     if fragment is None and project_registry:
-        project = field_schema_registry()
-        fragment = None if project is None else project.fragment(field_type)
+        fragment = _rule(field_schema_registry(), field_type)
     return None if fragment is None else copy.deepcopy(fragment)
+
+
+def _rule(registry: JsonSchemaRegistry | None, field_type: type) -> dict[str, Any] | None:
+    """The rule of the most specific class in ``field_type``'s MRO, the first for one class."""
+    if registry is None:
+        return None
+    for cls in field_type.__mro__:
+        for rule_type, fragment in registry.fields:
+            if rule_type is cls:
+                return fragment
+    return None

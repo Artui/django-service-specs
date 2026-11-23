@@ -409,9 +409,9 @@ class FormValidator(Validator):
     fragment's ``description``; so a ``forms.IntegerField`` subclass whose
     ``to_python`` keeps a string is a ``"string"`` parameter, and the shape check
     passes a string to it. The rules are read on every ``parameters()``, so
-    ``override_settings`` reaches a validator built before it, and at
-    construction too, where a field neither a rule nor the table declares is
-    refused. A field the adapter refuses outright, a ``JSONField``,
+    ``override_settings`` reaches a validator built before it. Construction
+    reads them only for a field the table cannot declare, which is refused
+    unless a rule declares it. A field the adapter refuses outright, a ``JSONField``,
     ``MultiValueField`` or ``ComboField``, stays refused whatever the rules say.
 
     A refusal is one
@@ -453,7 +453,7 @@ class FormValidator(Validator):
             name: field for name, field in fields.items() if not field.disabled
         }
         for name, field in self._declared.items():
-            self._parameter(name, field)
+            self._check_declarable(name, field)
         self._takes_instance = _declares_instance(form_class)
         self._clears: dict[str, str] = {
             name: clear
@@ -475,12 +475,23 @@ class FormValidator(Validator):
                 declared.append(Parameter(clear, "boolean"))
         return Parameters((*declared, *self._added))
 
+    def _check_declarable(self, name: str, field: forms.Field) -> None:
+        """Refuse a field the table cannot declare, reading the rules only for such a field."""
+        where = f"{self.form_class.__qualname__}.{name}"
+        _check_refused(field, where=where)
+        try:
+            _parameter(name, field, where=where)
+        except ImproperlyConfigured:
+            fragment = registered_fragment(
+                type(field), self.json_schema_registry, project_registry=self.project_registry
+            )
+            if fragment is None:
+                raise
+
     def _parameter(self, name: str, field: forms.Field) -> Parameter:
         """One field as a Parameter, its type a registered rule's where one names its class."""
         where = f"{self.form_class.__qualname__}.{name}"
-        for refused, reason in _REFUSED:
-            if isinstance(field, refused):
-                raise ImproperlyConfigured(f"{where}: a {type(field).__name__} {reason}.")
+        _check_refused(field, where=where)
         help_text = str(field.help_text) or None
         fragment = registered_fragment(
             type(field), self.json_schema_registry, project_registry=self.project_registry
@@ -842,6 +853,13 @@ def _check_model(form_class: type[forms.BaseForm]) -> None:
             f"{form_class.__qualname__}: a ModelForm with no Meta.model cannot be "
             "bound; declare the model it edits."
         )
+
+
+def _check_refused(field: forms.Field, *, where: str) -> None:
+    """Refuse a field a JSON wire cannot carry, whatever the rules say."""
+    for refused, reason in _REFUSED:
+        if isinstance(field, refused):
+            raise ImproperlyConfigured(f"{where}: a {type(field).__name__} {reason}.")
 
 
 def _parameter(name: str, field: forms.Field, *, where: str) -> Parameter:

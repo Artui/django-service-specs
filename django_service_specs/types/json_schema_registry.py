@@ -46,11 +46,3 @@ class JsonSchemaRegistry:
     def extend(self, *, fields: Sequence[_Rule] = ()) -> JsonSchemaRegistry:
         """A new registry with ``fields`` prepended, so for one class they answer first."""
         return replace(self, fields=tuple(fields) + self.fields)
-
-    def fragment(self, field_type: type) -> dict[str, Any] | None:
-        """The rule of the most specific class in ``field_type``'s MRO, or ``None``."""
-        for cls in field_type.__mro__:
-            for rule_type, fragment in self.fields:
-                if rule_type is cls:
-                    return fragment
-        return None

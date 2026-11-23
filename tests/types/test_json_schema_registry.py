@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from django_service_specs.schema.registered_fragment import registered_fragment
 from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 
 
@@ -18,15 +19,19 @@ class Middle(Base): ...
 class Leaf(Middle): ...
 
 
+def _answer(registry: JsonSchemaRegistry, field_type: type) -> object:
+    return registered_fragment(field_type, registry, project_registry=False)
+
+
 def test_an_empty_registry_answers_nothing() -> None:
-    assert JsonSchemaRegistry().fragment(Leaf) is None
+    assert _answer(JsonSchemaRegistry(), Leaf) is None
 
 
 def test_a_rule_answers_its_own_class_and_its_subclasses() -> None:
     registry = JsonSchemaRegistry(fields=((Middle, {"type": "string"}),))
-    assert registry.fragment(Middle) == {"type": "string"}
-    assert registry.fragment(Leaf) == {"type": "string"}
-    assert registry.fragment(Base) is None
+    assert _answer(registry, Middle) == {"type": "string"}
+    assert _answer(registry, Leaf) == {"type": "string"}
+    assert _answer(registry, Base) is None
 
 
 def test_the_most_specific_class_wins_whatever_the_order_of_the_rules() -> None:
@@ -34,15 +39,15 @@ def test_the_most_specific_class_wins_whatever_the_order_of_the_rules() -> None:
     registry = JsonSchemaRegistry(
         fields=((Base, {"type": "integer"}), (Middle, {"type": "string"}))
     )
-    assert registry.fragment(Leaf) == {"type": "string"}
-    assert registry.fragment(Base) == {"type": "integer"}
+    assert _answer(registry, Leaf) == {"type": "string"}
+    assert _answer(registry, Base) == {"type": "integer"}
 
 
 def test_a_rule_an_extension_prepends_wins_over_the_registry_s_own_for_one_class() -> None:
     base = JsonSchemaRegistry(fields=((Middle, {"type": "integer"}),))
     extended = base.extend(fields=[(Middle, {"type": "string"})])
-    assert extended.fragment(Middle) == {"type": "string"}
-    assert base.fragment(Middle) == {"type": "integer"}
+    assert _answer(extended, Middle) == {"type": "string"}
+    assert _answer(base, Middle) == {"type": "integer"}
 
 
 def test_extending_with_nothing_is_an_equal_registry() -> None:

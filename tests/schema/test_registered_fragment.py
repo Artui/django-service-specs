@@ -59,4 +59,4 @@ def test_the_fragment_is_a_copy_the_caller_may_change() -> None:
         fragment = registered_fragment(LooseIntegerField)
     assert fragment is not None
     fragment["type"] = "boolean"
-    assert PROJECT_RULES.fragment(LooseIntegerField) == {"type": "string"}
+    assert PROJECT_RULES.fields[0] == (LooseIntegerField, {"type": "string"})
