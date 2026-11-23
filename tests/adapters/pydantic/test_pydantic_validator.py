@@ -856,3 +856,23 @@ def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None
     assert required is not None
     assert required.required
     assert validator.unsendable == frozenset()
+
+
+class _Held(BaseModel):
+    rows: tuple[Address, ...]
+    tags: tuple[str, ...] = ()
+
+
+class _HeldAsList(BaseModel):
+    rows: list[Address]
+    tags: list[str] = []
+
+
+def test_a_homogeneous_tuple_is_declared_as_a_list_is_and_validated_to_a_tuple() -> None:
+    validator = PydanticValidator(_Held)
+    listed = PydanticValidator(_HeldAsList).parameters()
+    assert validator.parameters() == listed
+    assert parameters_schema(validator.parameters()) == parameters_schema(listed)
+    held = validator.validate({"rows": [{"city": "Oslo"}], "tags": ["a", "b"]}, CONTEXT)
+    assert held["tags"] == ("a", "b")
+    assert held["rows"] == (Address(city="Oslo"),)

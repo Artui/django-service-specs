@@ -165,6 +165,11 @@ class TestAnnotations:
         assert shape.type == "array"
         assert shape.items == Shape("integer", python=int, nullable=True)
 
+    def test_a_homogeneous_tuple_is_an_array_as_a_list_is(self) -> None:
+        tupled = _one(tuple[int | None, ...]).shape
+        listed = _one(list[int | None]).shape
+        assert (tupled.type, tupled.items, tupled.python) == ("array", listed.items, tuple)
+
     def test_a_str_keyed_dict_is_an_object_with_no_fields(self) -> None:
         shape = _one(dict[str, Any] | None).shape
         assert shape == Shape("object", python=dict, nullable=True)
@@ -184,7 +189,9 @@ class TestAnnotations:
             (set[int], "set[int]"),
             (dict[int, str], "dict[int, str]"),
             (dict, "dict"),
-            (tuple[int, ...], "tuple[int, ...]"),
+            (tuple[int, str], "tuple[int, str]"),
+            (tuple[int], "tuple[int]"),
+            (tuple[()], "tuple[()]"),
             (Literal["a", 1], "Literal['a', 1]"),
             (_Pairs, "_Pairs"),
             (_Nothing, "_Nothing"),
@@ -200,7 +207,7 @@ class TestAnnotations:
         assert message.startswith("Probe.x: ")
         assert re.search(rf"(typing\.)?{re.escape(name)} has no JSON type", message), message
         # The refusal says what would have been accepted.
-        assert "a pydantic model, dict[str, ...], or a list of any of these" in message
+        assert "a pydantic model, dict[str, ...], or a list or tuple[X, ...] of any" in message
 
     def test_unset_type_is_refused_here_where_the_dataclass_adapter_reads_it(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="Probe.x: .*UnsetType has no JSON type"):

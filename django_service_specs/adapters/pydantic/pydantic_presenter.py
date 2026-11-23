@@ -99,7 +99,7 @@ def _gather(shape: Shape, value: Any) -> Any:
                 data[fs.input_name] = _gather(fs.shape, found)
         return data
     if shape.items is not None:
-        return [_gather(shape.items, row) for row in rows_of(value)]
+        return shape.python(_gather(shape.items, row) for row in rows_of(value))
     return value
 
 

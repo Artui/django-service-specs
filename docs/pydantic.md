@@ -58,7 +58,7 @@ same parameter:
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum` and a `Literal` label nothing. |
-| `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, as `list[Decimal]` on a dataclass does. The list's length is declared: see below. |
+| `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, as `list[Decimal]` on a dataclass does. The list's length is declared: see below. A homogeneous `tuple[X, ...]` is the same array, validated into a tuple; a fixed-length `tuple[A, B]` is refused. |
 | a model | An object, with its fields as nested Parameters. |
 | `dict[str, X]` | An object with no declared fields, as a dataclass's `dict[str, X]` is. Its values are the model's to validate. |
 

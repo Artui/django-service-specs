@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A pydantic field `tuple[X, ...]` is an array, as `list[X]` is**, as 0.34.2 made it for
+  dataclasses. `PydanticPresenter` and `PydanticValidator` both refused it with "has no
+  JSON type this adapter can declare", though pydantic's own schema calls it an array. It
+  now declares the same output, Parameters and schema as `list[X]` (a `()` default is
+  declared as `[]`), presents as a JSON array, and validates into a tuple; a `strict`
+  model is handed a tuple for it. A fixed-length `tuple[A, B]` is still refused.
+
 ## [0.34.2] — 2026-11-21
 
 ### Fixed

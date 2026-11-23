@@ -49,7 +49,7 @@ adapter.
 
 _SUPPORTED = (
     "str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, a pydantic "
-    "model, dict[str, ...], or a list of any of these, each optionally '| None'"
+    "model, dict[str, ...], or a list or tuple[X, ...] of any of these, each optionally '| None'"
 )
 
 
@@ -223,11 +223,11 @@ def _output_name(name: str, info: FieldInfo) -> str:
 
 
 def _default(info: FieldInfo) -> Any:
-    # A ``default_factory``'s value is per instance, so it is not a printable default.
+    # A ``default_factory``'s value is per instance; a tuple is declared as the list JSON sends.
     default = info.default
     if default is PydanticUndefined or not is_json_native(default):
         return UNSET
-    return default
+    return list(default) if isinstance(default, tuple) else default
 
 
 def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
@@ -277,7 +277,10 @@ def _read(
         )
     elif origin is list and len(args) == 1:
         items, _ = _read(args[0], where=where, stack=stack)
-        shape = Shape("array", nullable=nullable, items=items)
+        shape = Shape("array", python=list, nullable=nullable, items=items)
+    elif origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+        items, _ = _read(args[0], where=where, stack=stack)
+        shape = Shape("array", python=tuple, nullable=nullable, items=items)
     elif origin is dict and args[:1] == (str,):
         shape = Shape("object", python=dict, nullable=nullable)
     elif isinstance(base, type) and issubclass(base, Enum):

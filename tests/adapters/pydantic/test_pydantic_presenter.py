@@ -19,6 +19,7 @@ from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPr
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
+from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.pydantic.utils import (
@@ -396,3 +397,53 @@ def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> N
         "addresses": [None, {"city": "Oslo", "postcode": None}],
         "tags": [],
     }
+
+
+class _Stop(BaseModel):
+    waiting: tuple[Address, ...]
+    tags: tuple[str, ...] = ()
+    gaps: tuple[Address | None, ...] = ()
+
+
+class _StopAsList(BaseModel):
+    waiting: list[Address]
+    tags: list[str] = []
+    gaps: list[Address | None] = []
+
+
+def test_a_homogeneous_tuple_is_presented_as_a_json_array_of_objects() -> None:
+    stop = _Stop(waiting=(Address(city="Oslo"),), gaps=(None,))
+    assert PydanticPresenter(_Stop).present(stop) == {
+        "waiting": [{"city": "Oslo", "postcode": None}],
+        "tags": [],
+        "gaps": [None],
+    }
+    read = PydanticPresenter(_Stop).present(SimpleNamespace(waiting=[SimpleNamespace(city="Rome")]))
+    assert read == {"waiting": [{"city": "Rome", "postcode": None}], "tags": [], "gaps": []}
+
+
+def test_a_tuple_declares_the_output_a_list_does() -> None:
+    tupled = PydanticPresenter(_Stop).output()
+    listed = PydanticPresenter(_StopAsList).output()
+    assert tupled == listed
+    assert output_schema(tupled) == output_schema(listed)
+    assert output_schema(tupled)["properties"]["waiting"]["type"] == "array"
+    assert tupled.get("gaps").items_nullable
+
+
+class _Strict(BaseModel, strict=True):
+    tags: tuple[str, ...]
+    names: list[str]
+
+
+def test_a_strict_model_is_handed_each_array_as_the_container_it_declares() -> None:
+    presented = PydanticPresenter(_Strict).present({"tags": ["a"], "names": ("b",)})
+    assert presented == {"tags": ["a"], "names": ["b"]}
+
+
+def test_a_fixed_length_tuple_stays_refused() -> None:
+    class Fixed(BaseModel):
+        pair: tuple[int, str]
+
+    with pytest.raises(ImproperlyConfigured, match="no JSON type"):
+        PydanticPresenter(Fixed)
