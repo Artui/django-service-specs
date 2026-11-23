@@ -10,6 +10,7 @@ from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.utils import (
     checked_server_values,
+    namesaked_providers,
     server_arguments_label,
     split_seed_named,
 )
@@ -71,8 +72,8 @@ def check_server_arguments(
        and, on a service spec, its ``input_data`` and its target selector's
        ``kwargs``, the providers
        [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-       walks. A key a provider fills is dropped from the caller's arguments
-       and answered by the provider alone, so a binding would do nothing; one
+       walks. A key a provider fills where its values reach is dropped from
+       the caller's arguments and answered by the provider alone, so a binding would do nothing; one
        it may decline with ``UNSET`` is the provider's on every call where it
        answers, so a binding would hold only when the provider happens not
        to. Each half is held by its own test:
@@ -82,7 +83,12 @@ def check_server_arguments(
        test_a_validator_field_input_data_fills_is_refused (``input_data``) and
        test_a_read_the_target_selector_s_provider_fills_is_refused (the
        target's ``kwargs``). A provider whose return names no keys may fill
-       any name and so names none, as for ``server_owned_keys``.
+       any name and so names none, as for ``server_owned_keys``. A namesake
+       is not refused: a ``kwargs`` key named like a Validator field, or a
+       target selector's named like a field or a spec's read, leaves that
+       parameter the caller's, so a bound value reaches it as a caller's
+       would, and withholding it meets rule 5
+       (test_binding_a_namesake_is_accepted_and_withholding_it_meets_rule_5).
     5. **A withheld name no call could then do without.** Withheld, the
        parameter is absent, so it is refused if the shape check demands it -
        required and declaring no default, read as dispatch relaxes a
@@ -187,16 +193,12 @@ def check_server_arguments(
 
 
 def _provider_names(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
-    """Every key a typed provider of ``spec`` fills or may decline."""
-    providers: list[Callable[..., Any] | None] = [spec.kwargs]
-    if isinstance(spec, ServiceSpec):
-        target = spec.target_selector_spec()
-        providers += [spec.input_data, None if target is None else target.kwargs]
+    """Every key a typed provider of ``spec`` fills or may decline, less its namesakes."""
     found: set[str] = set()
-    for provider in providers:
+    for provider, namesakes in namesaked_providers(spec):
         keys = provider_keys(provider)
         if keys is not None:
-            found |= keys.filled | keys.declinable
+            found |= (keys.filled | keys.declinable) - namesakes
     return frozenset(found)
 
 

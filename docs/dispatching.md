@@ -96,6 +96,33 @@ The order is the design, and each place reads as if it could move:
   Preconditions follow them, in the same place, as djangorestframework-services
   orders the two.
 
+### The service's pool
+
+A write's service, its affordances and its preconditions are handed one pool,
+built in this order, each layer over the one before:
+
+1. the seeds, `call_context` and the call's shapes;
+2. the Validator's values, spread by name, less a field named like a seed;
+3. the spec's `reads`, as the caller sent them;
+4. `data`, the Validator's validated object;
+5. what the Validator bound in `pool`;
+6. the spec's `kwargs` provider's answer, over the `extra_kwargs` beneath it;
+7. the resolved target, `instance` or `collection`.
+
+So **a `kwargs` key named like a Validator field is a namesake, not a fill.**
+The field is the caller's: dispatch asks for it, checks it and validates it
+into `data`. The service's keyword of that name is the provider's answer,
+which outranks the spread value. Sent `team_id=5` with a provider answering
+`999`, the service takes `team_id=999` and `data["team_id"] == 5`. Beside an
+`input_data` provider filling the same name with `1`, `data["team_id"]` is
+`1`: the author fills both seats, and they may differ. A target selector's
+`kwargs` reaches only that selector, so its answer is the selector's keyword
+and never the service's; a Validator field or a `reads` name of the spec it
+shares is still the caller's. Only `input_data` fills a Validator field, and
+only the spec's `kwargs` fills its `reads`, so
+[`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+leaves a namesake out, as it does a field named like a registered seed.
+
 ## Per-call values beneath the provider
 
 A transport sometimes knows a service keyword per call that the spec cannot

@@ -22,7 +22,10 @@ def unreceived_fields(
     by no route, on a mount registering ``pool_seeds``. A top-level field
     named like a registered seed or the call's ``request`` or ``view``
     reaches the service through ``data`` alone, since the name in the pool
-    is the seed's, so a service taking it by name only never receives it. A
+    is the seed's, so a service taking it by name only never receives it.
+    So does one the spec's ``kwargs`` is annotated to fill, a namesake whose
+    keyword is the provider's
+    (test_a_field_a_kwargs_namesake_shadows_is_unreceived_by_name). A
     ``many`` spec's rows reach the service as the list under
     ``many_argument``, or in ``data``, so its one field is that list. A
     service taking ``**kwargs`` is handed ``data`` with the rest, and so
@@ -76,7 +79,8 @@ def unreceived_fields(
     ):
         return frozenset()
     seed_named = seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
+    shadowed = fields & keys.filled
     takes_all = any(param.kind is inspect.Parameter.VAR_KEYWORD for param in params.values())
     if takes_all:
         return frozenset()
-    return frozenset(name for name in fields if name in seed_named or name not in named)
+    return frozenset(name for name in fields if name in seed_named | shadowed or name not in named)

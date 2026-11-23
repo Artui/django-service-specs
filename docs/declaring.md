@@ -473,10 +473,15 @@ permission check reading such a key from its `arguments` uses `.get`. The
 caller's value for a filled key is dropped, and for a declinable one it stands
 beneath the provider's answer. The provider's values reach these: a selector's `kwargs` fills that selector's `reads`, a
 service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
+A spec's `kwargs` key named like a Validator field, or a target selector's
+`kwargs` key named like a Validator field or a spec's read, is a namesake:
+the parameter stays the caller's, and the provider's value goes to its own
+callable under that name ([the service's pool](dispatching.md#the-services-pool)).
 A provider annotated to fill a parameter declared anywhere else -
-`input_data` naming a read, `kwargs` naming a Validator field or the target
-selector's read - is refused with `ImproperlyConfigured` when the spec is
-built or, for a Validator field, when `parameters()` is assembled. So is
+`input_data` naming a read, a spec's `kwargs` naming the target selector's
+read, any provider naming a shape - is refused with `ImproperlyConfigured`
+when the spec is built or, if the annotation resolves later, when
+`parameters()` is assembled. So is
 one annotated to fill a `many` spec's list, the `many_argument`, or to
 possibly fill it: no provider reaches it, and a Validator field of the same
 name does not exempt the key.

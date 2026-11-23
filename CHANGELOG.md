@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-11-23
+
+### Changed
+- **A provider's key may share a name with a parameter of another seat: a namesake, not a
+  fill.** A service spec's typed `kwargs` key named like a Validator field, and a target
+  selector's typed `kwargs` key named like a Validator field or a spec's read, were refused
+  by `parameters()`, `check_seeds` and every transport build, though dispatch runs them.
+  They are accepted, by the rule a field named like a registered seed already follows: the
+  parameter stays the caller's, asked for, checked and validated into `data`, and the
+  provider's value goes to its own callable under that name. For the spec's `kwargs` that is
+  the service's keyword, which outranks the spread field, so a body's `team_id=5` beside a
+  provider's `999` hands the service `team_id=999` and `data["team_id"] == 5`; beside an
+  `input_data` filling it with `1`, `data` holds `1`. A target selector's provider reaches
+  only that selector. The same holds for a `many` spec's row field. `docs/dispatching.md`
+  states the service's pool in order.
+- **`server_owned_keys` leaves a namesake out**, so a transport subtracting it still asks
+  for a parameter `parameters()` marks required. A key `input_data` fills is still in it. A
+  provider naming a read of a seat it does not reach (`input_data` on a read, the spec's
+  `kwargs` on the target's read), a shape, or a `many` spec's list is refused as before.
+- **`check_server_arguments` accepts binding a namesake**, whose bound value reaches the
+  Validator and `data` as a caller's would; withholding a required one is refused by the
+  rule for a parameter no call could do without. **`unreceived_fields` answers a field the
+  spec's `kwargs` is annotated to fill** for a service taking it by name only, since that
+  keyword is the provider's, as it answers a seed-named field.
+
 ## [0.34.4] — 2026-11-23
 
 ### Fixed
@@ -2865,7 +2890,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.34.4...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
 [0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
 [0.34.2]: https://github.com/Artui/django-service-specs/compare/v0.34.1...v0.34.2
