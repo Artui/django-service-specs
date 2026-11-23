@@ -117,10 +117,10 @@ def _row_affordance_flags(instance: Any, affordances: Sequence[Affordance]) -> d
     if not isinstance(instance, Model):
         raise ImproperlyConfigured(
             "An affordance condition on the row needs a resolved model instance, and this "
-            f"dispatch resolved {type(instance).__name__}. Declare row conditions only on "
+            f"dispatch resolved {instance.__class__.__name__}. Declare row conditions only on "
             "an operation that targets one row, through an instance_selector_spec."
         )
-    model = type(instance)
+    model = instance.__class__
     aliases: dict[str, int] = {
         f"affordance__{index}": index
         for index, affordance in enumerate(affordances)

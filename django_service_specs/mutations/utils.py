@@ -101,7 +101,7 @@ def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
 
 def assign_changed_values(instance: Model, values: dict[str, Any]) -> tuple[FieldChange, ...]:
     """Set on ``instance`` each of ``values`` that differs from what it holds, and return those."""
-    changes = diff_attrs(instance, form_values(type(instance), values))
+    changes = diff_attrs(instance, form_values(instance.__class__, values))
     write_values(instance, {change.field: change.new for change in changes})
     return changes
 
@@ -117,7 +117,7 @@ def split_file_values(
 
 def write_values(instance: Model, values: dict[str, Any]) -> None:
     """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``."""
-    files = file_fields(type(instance))
+    files = file_fields(instance.__class__)
     for attr, value in values.items():
         field = files.get(attr)
         if field is None:
@@ -230,7 +230,7 @@ def auto_now_field_names(instance: Model) -> tuple[str, ...]:
 
 def dimension_field_names(instance: Model, changed: tuple[str, ...]) -> tuple[str, ...]:
     """The ``width_field`` and ``height_field`` of each image field in ``changed``."""
-    files = file_fields(type(instance))
+    files = file_fields(instance.__class__)
     names: list[str] = []
     for attr in changed:
         field = files.get(attr)

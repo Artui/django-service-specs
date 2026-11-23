@@ -116,14 +116,14 @@ def row_object_of(row: Any, row_object: str | Callable[[Any], Any]) -> Model | N
         if found is _MISSING:
             raise ImproperlyConfigured(
                 f"SelectorSpec.row_object is {row_object!r}, and a row of type "
-                f"{type(row).__name__} has no attribute {row_object!r}."
+                f"{row.__class__.__name__} has no attribute {row_object!r}."
             )
     else:
         found = row_object(row)
     if found is None or (isinstance(found, Model) and found.pk is not None):
         return found
     raise ImproperlyConfigured(
-        f"SelectorSpec.row_object answered {found!r} for a row of type {type(row).__name__}. "
+        f"SelectorSpec.row_object answered {found!r} for a row of type {row.__class__.__name__}. "
         "It must answer a saved model instance, or None for a row with no object."
     )
 
@@ -172,7 +172,7 @@ def _answer_rows(
                     "condition on the row is answered by finding the row. Return saved "
                     "instances."
                 )
-            by_model.setdefault(type(row), []).append(row.pk)
+            by_model.setdefault(row.__class__, []).append(row.pk)
         elif isinstance(row, Mapping):
             if row_conditions:
                 raise ImproperlyConfigured(
@@ -183,7 +183,7 @@ def _answer_rows(
                 )
         else:
             raise ImproperlyConfigured(
-                f"{source_label} returned a row of type {type(row).__name__}. Affordance "
+                f"{source_label} returned a row of type {row.__class__.__name__}. Affordance "
                 "answers are carried by model instances and mappings; return one of those, "
                 "or a QuerySet."
             )
@@ -200,7 +200,7 @@ def _answer_rows(
         if isinstance(row, Mapping):
             answered.append({**row, **constants})
             continue
-        flags = answers.get(type(row), {}).get(row.pk, {})
+        flags = answers.get(row.__class__, {}).get(row.pk, {})
         for alias in row_conditions:
             # ``None`` for a row the answers query did not find, not ``False``.
             setattr(row, alias, flags.get(alias))

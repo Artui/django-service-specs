@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A lazy row, such as `request.user`, is written and answers row conditions.**
+  `update_from_input` and `aupdate_from_input` on a `SimpleLazyObject` over a saved row
+  raised `AttributeError: type object 'SimpleLazyObject' has no attribute '_meta'`, and so
+  did a row-condition affordance on a dispatch whose target selector returned the lazy
+  principal (`'_base_manager'`), and a selector's row-condition answer on a lazy row. The
+  row's model is now read through `instance.__class__`, which the proxy forwards, so a
+  "my profile" selector that returns `user` works under session auth. A selector's lazy row
+  had its flag answered by a lookup keyed on the proxy's type, so fixing only the query
+  would have set every flag to `None`; both are read the same way. `ChangeResult.instance`
+  is the instance as passed: a lazy instance comes back as the same proxy.
+
 ## [0.35.0] — 2026-11-23
 
 ### Changed
