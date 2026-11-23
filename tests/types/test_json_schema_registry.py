@@ -83,6 +83,8 @@ def _forms_or_drf(names: set[str]) -> list[str]:
         "django_service_specs.types.json_schema_registry",
         "django_service_specs.schema.registered_fragment",
         "django_service_specs.settings",
+        "django_service_specs.specs.route_captures",
+        "django_service_specs.schema.fragment_keywords",
     ],
 )
 def test_the_rules_and_their_resolver_import_neither_forms_nor_drf(module: str) -> None:

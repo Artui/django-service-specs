@@ -38,6 +38,7 @@ async def test_aupdate_from_input_writes_a_lazy_row() -> None:
 
     result = await aupdate_from_input(lazy, {"first_name": "Ada"})
 
+    assert result.instance is lazy
     assert result.changed_fields == ("first_name",)
     await sync_to_async(saved.refresh_from_db)()
     assert saved.first_name == "Ada"
