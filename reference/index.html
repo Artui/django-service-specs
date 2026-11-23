@@ -14707,6 +14707,17 @@ key the kernel's <code>"unknown"</code>. Any other of pydantic's own types is
 <code>ValueError</code> or an <code>assert</code> in a validator is too, as DRF says for a
 message raised with no code. A <code>PydanticCustomError</code>'s type is the
 author's code, and is kept, as a Django <code>ValidationError</code>'s is.</p>
+<p><strong>A strict model validates decoded JSON as JSON</strong>, in pydantic's JSON
+mode, so it takes the JSON its declared schema describes: a list for a
+<code>tuple[X, ...]</code>, an ISO string for a <code>date</code> or a <code>datetime</code>, a value
+for an <code>Enum</code>, a string or a number for a <code>Decimal</code>, while strict JSON
+still refuses <code>3</code> for a <code>str</code>. Strict is wherever pydantic reads it:
+the model's config, a field's <code>strict=True</code> or <code>Strict()</code>, a
+<code>StrictInt</code>, a nested model. A validator's <code>info.mode</code> is then
+<code>"json"</code>. Arguments JSON cannot write back unchanged - a Python caller's
+<code>date</code> or <code>Decimal</code>, a tuple, a string with a lone surrogate, an
+integer past a float's range - are validated in Python mode, as is every
+call to a model that declares nothing strict.</p>
 <p><strong>Time zones are pydantic's</strong>: an offset-less date-time stays naive, where
 <code>DataclassValidator</code> makes it aware as Django's forms do. Declare the
 offset, or convert in the service.</p>
