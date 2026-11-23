@@ -223,11 +223,20 @@ def _output_name(name: str, info: FieldInfo) -> str:
 
 
 def _default(info: FieldInfo) -> Any:
-    # A ``default_factory``'s value is per instance; a tuple is declared as the list JSON sends.
+    # A ``default_factory``'s value is per instance, so it is not a printable default.
     default = info.default
     if default is PydanticUndefined or not is_json_native(default):
         return UNSET
-    return list(default) if isinstance(default, tuple) else default
+    return _as_json(default)
+
+
+def _as_json(value: Any) -> Any:
+    """``value`` with every tuple, at any depth, as the list JSON sends for it."""
+    if isinstance(value, (list, tuple)):
+        return [_as_json(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _as_json(item) for key, item in value.items()}
+    return value
 
 
 def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:

@@ -192,6 +192,7 @@ class TestAnnotations:
             (tuple[int, str], "tuple[int, str]"),
             (tuple[int], "tuple[int]"),
             (tuple[()], "tuple[()]"),
+            (list[int, ...], "list[int, ...]"),
             (Literal["a", 1], "Literal['a', 1]"),
             (_Pairs, "_Pairs"),
             (_Nothing, "_Nothing"),

@@ -876,3 +876,19 @@ def test_a_homogeneous_tuple_is_declared_as_a_list_is_and_validated_to_a_tuple()
     held = validator.validate({"rows": [{"city": "Oslo"}], "tags": ["a", "b"]}, CONTEXT)
     assert held["tags"] == ("a", "b")
     assert held["rows"] == (Address(city="Oslo"),)
+
+
+class _Nested(BaseModel):
+    pairs: list[tuple[int, ...]] = [(1, 2)]
+    named: dict[str, tuple[int, ...]] = {"a": (3,)}
+
+
+class _NestedAsLists(BaseModel):
+    pairs: list[list[int]] = [[1, 2]]
+    named: dict[str, list[int]] = {"a": [3]}
+
+
+def test_a_tuple_inside_a_default_is_declared_as_a_list() -> None:
+    nested = PydanticValidator(_Nested).parameters()
+    assert nested == PydanticValidator(_NestedAsLists).parameters()
+    assert [p.default for p in nested] == [[[1, 2]], {"a": [3]}]
