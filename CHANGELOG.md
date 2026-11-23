@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a parameter `parameters()` marks required. A key `input_data` fills is still in it. A
   provider naming a read of a seat it does not reach (`input_data` on a read, the spec's
   `kwargs` on the target's read), a shape, or a `many` spec's list is refused as before.
+- **`check_server_arguments` accepts binding a namesake**, whose bound value reaches the
+  Validator and `data` as a caller's would; withholding a required one is refused by the
+  rule for a parameter no call could do without. **`unreceived_fields` answers a field the
+  spec's `kwargs` is annotated to fill** for a service taking it by name only, since that
+  keyword is the provider's, as it answers a seed-named field.
 
 ## [0.34.4] — 2026-11-23
 

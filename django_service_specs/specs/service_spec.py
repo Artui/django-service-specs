@@ -410,18 +410,7 @@ class ServiceSpec(AffordanceDeclarer):
             if self.validator is not None
             else Parameters()
         )
-        _check_reach(
-            self,
-            [
-                *_read_seats(self),
-                _Seat(
-                    "ServiceSpec.validator",
-                    own,
-                    "ServiceSpec.input_data",
-                    shared=_namesakes(self, "ServiceSpec.kwargs"),
-                ),
-            ],
-        )
+        _check_reach(self, _read_seats(self))
         if self.many:
             own = Parameters.of(_the_list(self, items=own))
         assembled = _beside_the_target(self) + self.shapes + own
@@ -604,11 +593,10 @@ def _read_seats(spec: ServiceSpec) -> list[_Seat]:
     return seats
 
 
-def _namesakes(spec: ServiceSpec, *providers: str) -> frozenset[str]:
-    """``providers`` and the target selector's ``kwargs``: whose key here is a namesake, no fill."""
-    if spec.target_selector_spec() is None:
-        return frozenset(providers)
-    return frozenset((*providers, f"{_target_label(spec)}.kwargs"))
+def _namesakes(spec: ServiceSpec) -> frozenset[str]:
+    """The target selector's ``kwargs``, if any, whose key on a read here is a namesake."""
+    target = spec.target_selector_spec()
+    return frozenset() if target is None else frozenset({f"{_target_label(spec)}.kwargs"})
 
 
 def _target_label(spec: ServiceSpec) -> str:

@@ -313,6 +313,24 @@ def seed_named_fields(
     return frozenset()
 
 
+def namesaked_providers(
+    spec: ServiceSpec | SelectorSpec, *, call_context: dict[str, Any] | None = None
+) -> list[tuple[Callable[..., Any] | None, frozenset[str]]]:
+    """Each provider of ``spec``, with the names its key shares with another seat and fills not."""
+    if isinstance(spec, SelectorSpec):
+        return [(spec.kwargs, frozenset())]
+    fields = (
+        validator_parameters(spec.validator, call_context=call_context).names()
+        if spec.validator is not None and not spec.many
+        else frozenset()
+    )
+    providers = [(spec.kwargs, fields), (spec.input_data, frozenset())]
+    target = spec.target_selector_spec()
+    if target is not None:
+        providers.append((target.kwargs, fields | spec.reads.names()))
+    return providers
+
+
 def shape_check(
     spec: ServiceSpec | SelectorSpec,
     parameters: Parameters,

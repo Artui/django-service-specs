@@ -5,20 +5,28 @@ from typing import Any
 
 import pytest
 from asgiref.sync import async_to_sync
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import QuerySet
 from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
 from django_service_specs.dispatch.check_seeds import check_seeds
+from django_service_specs.dispatch.check_server_arguments import check_server_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.provider_reached import provider_reached
+from django_service_specs.dispatch.unreceived_fields import unreceived_fields
+from django_service_specs.dispatch.utils import namesaked_providers
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.server_arguments import ServerArguments
+from django_service_specs.types.unset import UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import OPEN, PK, Record, make_user
@@ -36,6 +44,10 @@ FILLED = 1
 
 class _Team(TypedDict):
     team_id: int
+
+
+class _MayTeam(TypedDict):
+    team_id: int | UnsetType
 
 
 def _team() -> _Team:
@@ -173,6 +185,12 @@ def test_input_data_still_owns_the_field_it_fills() -> None:
     assert "team_id" in server_owned_keys(_b())
 
 
+def _many() -> ServiceSpec:
+    return ServiceSpec(
+        service=Record(), permissions=OPEN, many=True, validator=Spread(), kwargs=_team
+    )
+
+
 def test_a_many_row_field_is_no_top_level_name_to_leave_out() -> None:
     spec = ServiceSpec(
         service=Record(),
@@ -233,3 +251,74 @@ def test_a_target_provider_named_like_a_read_leaves_the_read_the_caller_s(entry:
     assert selected["team_id"] == PROVIDED
     [call] = spec.service.calls
     assert call["team_id"] == BODY
+
+
+@ENTRIES
+def test_a_many_row_field_stays_the_caller_s_and_the_keyword_the_provider_s(entry: Any) -> None:
+    spec = _many()
+    entry(spec, principal=make_user("ada"), arguments={"items": [{"team_id": BODY, "title": "t"}]})
+    assert isinstance(spec.service, Record)
+    [call] = spec.service.calls
+    assert (call["team_id"], call["data"]) == (PROVIDED, [{"team_id": BODY, "title": "t"}])
+
+
+ALL_SHAPES = [*SHAPES.values(), _on_a_read, _many]
+
+
+@pytest.mark.parametrize("shape", ALL_SHAPES)
+def test_server_owned_keys_and_the_dispatch_readers_agree_on_namesakes(
+    shape: Callable[[], ServiceSpec],
+) -> None:
+    spec = shape()
+    filled = set()
+    for provider, namesakes in namesaked_providers(spec):
+        keys = provider_keys(provider)
+        filled |= set() if keys is None else keys.filled - namesakes
+    assert server_owned_keys(spec) - DEFAULT_POOL_SEEDS.reserved == filled
+
+
+def _service_taking(spec: ServiceSpec, service: Callable[..., Any]) -> ServiceSpec:
+    return ServiceSpec(
+        service=service, permissions=OPEN, validator=spec.validator, kwargs=spec.kwargs
+    )
+
+
+def _takes_both(*, team_id: int, title: str) -> None: ...
+
+
+def _may_team() -> _MayTeam:
+    return {"team_id": PROVIDED}
+
+
+def test_a_field_a_kwargs_namesake_shadows_is_unreceived_by_name() -> None:
+    assert unreceived_fields(_service_taking(_a(), _takes_both)) == {"team_id"}
+
+
+def test_a_field_a_declinable_namesake_may_leave_is_received() -> None:
+    spec = ServiceSpec(service=_takes_both, validator=Spread(), kwargs=_may_team)
+    assert unreceived_fields(spec) == frozenset()
+
+
+@pytest.mark.parametrize("shape", [_a, _a2, lambda: _d(), _on_a_read], ids=["A", "A2", "D", "read"])
+def test_binding_a_namesake_is_accepted_and_withholding_it_meets_rule_5(
+    shape: Callable[[], ServiceSpec],
+) -> None:
+    spec = shape()
+    check_server_arguments(spec, ServerArguments(values={"team_id": BODY}))
+    withheld = ServerArguments(withheld=frozenset({"team_id"}))
+    required = next(param for param in spec.parameters() if param.name == "team_id").required
+    if not required:
+        check_server_arguments(spec, withheld)
+        return
+    with pytest.raises(ImproperlyConfigured, match="which no call could then do without"):
+        check_server_arguments(spec, withheld)
+
+
+def test_a_bound_namesake_reaches_data_and_the_keyword_stays_the_provider_s() -> None:
+    spec = _a()
+    server = ServerArguments(values={"team_id": BODY})
+    arguments = apply_server_arguments(spec, {"title": "t"}, server)
+    dispatch(spec, principal=make_user("ada"), arguments=arguments)
+    assert isinstance(spec.service, Record)
+    [call] = spec.service.calls
+    assert (call["team_id"], call["data"]) == (PROVIDED, {"team_id": BODY, "title": "t"})
