@@ -1020,9 +1020,10 @@ class _StrictBeside(BaseModel):
 
 
 class TestWhatJsonCannotWriteBack:
-    def test_an_integer_past_a_float_s_range_is_no_float(self) -> None:
+    @pytest.mark.parametrize("sent", [10**400, -(10**400)])
+    def test_an_integer_past_a_float_s_range_is_no_float(self, sent: int) -> None:
         with pytest.raises(InvalidArguments) as caught:
-            PydanticValidator(_Lax).validate({"ratio": 10**400}, CONTEXT)
+            PydanticValidator(_Lax).validate({"ratio": sent}, CONTEXT)
         assert coded(caught.value.detail) == {
             "ratio": [("Input should be a valid number", "invalid")]
         }
