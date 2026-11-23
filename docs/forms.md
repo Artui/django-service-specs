@@ -190,8 +190,9 @@ docs/examples/forms_adapter.py:field_rules
 `code` is a `string` parameter, so `{"code": "AB-12"}` passes the shape check
 and the form cleans it. The field still states `required`, and its
 `help_text` wins over the fragment's `description`; an optional field is
-nullable, as every optional field is here. The validator's own rules answer
-first and the project's the rest; `project_registry=False` reads only its own.
+nullable, as every optional field is here. The most specific class with a rule in
+either registry wins, the validator's own answering a class both name;
+`project_registry=False` reads only its own.
 The rules are read on every `parameters()`; construction reads them only for a
 field the table cannot declare, which is refused unless a rule declares it. A `JSONField`,
 `MultiValueField` or `ComboField` stays refused whatever the rules say. See

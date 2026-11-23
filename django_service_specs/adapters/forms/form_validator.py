@@ -399,10 +399,11 @@ class FormValidator(Validator):
     **A field type can be declared by a rule.** Before its own table, the
     adapter asks
     [`registered_fragment`][django_service_specs.schema.registered_fragment.registered_fragment]
-    for the field's class: the rules of ``json_schema_registry``, through the
-    class's MRO, then the project's, which the
-    ``SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`` setting names, unless
-    ``project_registry=False``. A rule's fragment is the parameter's type, read
+    for the field's class: the most specific class in its MRO with a rule in
+    ``json_schema_registry`` or in the project's, which the
+    ``SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`` setting names unless
+    ``project_registry=False``, the seat's answering a class both name. A rule's
+    fragment is the parameter's type, read
     by [`fragment_keywords`][django_service_specs.schema.fragment_keywords.fragment_keywords],
     with ``required`` the field's, ``nullable`` when the field is optional or
     the fragment says so, and ``help`` the field's ``help_text`` or the

@@ -8,6 +8,7 @@ from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from tests.schema.utils import PROJECT_RULES, LooseIntegerField
 
 PROJECT = "tests.schema.utils.PROJECT_RULES"
+BASE_RULES = JsonSchemaRegistry(fields=((forms.IntegerField, {"type": "string"}),))
 
 
 def test_no_rule_anywhere_answers_none() -> None:
@@ -30,11 +31,23 @@ def test_the_seat_s_rule_wins_over_the_project_s_for_one_class() -> None:
         assert registered_fragment(LooseIntegerField, seat) == {"type": "number"}
 
 
-def test_the_seat_s_rule_for_a_base_wins_over_the_project_s_for_the_class() -> None:
-    # The seat's rules are read through the whole MRO before the project's are read.
+def test_the_project_s_rule_for_the_class_wins_over_the_seat_s_for_a_base() -> None:
     seat = JsonSchemaRegistry(fields=((forms.IntegerField, {"type": "number"}),))
     with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=PROJECT):
+        assert registered_fragment(LooseIntegerField, seat) == {"type": "string"}
+
+
+def test_the_seat_s_rule_for_the_class_wins_over_the_project_s_for_a_base() -> None:
+    project = "tests.schema.test_registered_fragment.BASE_RULES"
+    seat = JsonSchemaRegistry(fields=((LooseIntegerField, {"type": "number"}),))
+    with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=project):
         assert registered_fragment(LooseIntegerField, seat) == {"type": "number"}
+
+
+def test_a_seat_s_rule_for_a_base_answers_a_class_no_registry_names() -> None:
+    seat = JsonSchemaRegistry(fields=((forms.IntegerField, {"type": "number"}),))
+    with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=PROJECT):
+        assert registered_fragment(forms.IntegerField, seat) == {"type": "number"}
 
 
 def test_the_project_answers_a_class_the_seat_names_no_rule_for() -> None:

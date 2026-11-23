@@ -23,9 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   most specific class wins, and imports neither Django's forms nor DRF.
   `SERVICE_SPECS_FIELD_SCHEMA_REGISTRY` names the project's registry by dotted path, read at
   the call, so `override_settings` reaches a spec built before it.
-  `registered_fragment(field_type, registry, *, project_registry=True)` answers a class from
-  a seat's own registry first and the project's second; `project_registry=False` opts a seat
-  out, and an empty seat registry adds nothing and still reads the project's.
+  `registered_fragment(field_type, registry, *, project_registry=True)` answers a class by
+  the most specific class in its MRO with a rule in either registry, a seat's own rule
+  answering a class both name, so a project's rule for its own field class wins over a seat's
+  rule for a base; `project_registry=False` opts a seat out, and an empty seat registry adds nothing and still reads the project's.
   `fragment_keywords` turns a fragment into a `Parameter`'s or an `OutputField`'s keywords,
   keeping what the declaration can state.
 - **`FormValidator` reads the rules before its table**, with `json_schema_registry=` and

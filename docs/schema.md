@@ -439,14 +439,14 @@ With that setting, `FormValidator` declares a `LooseIntegerField` a
 `string`, and a JSON `"AB-12"` reaches the field. The rules are answered in
 this order:
 
-- **The seat's own rules, then the project's.** A seat handed a registry of
-  its own (`FormValidator(..., json_schema_registry=...)`) reads it first, and
-  the project's registry answers only a class the seat's does not. An empty
-  seat registry adds nothing and still reads the project's.
-- **The most specific class wins**, through the field class's MRO, whatever the
-  order the rules are listed in. The seat's rules are read through the whole
-  MRO before the project's, so a seat's rule for `forms.IntegerField` answers
-  a `LooseIntegerField` the project has its own rule for.
+- **The most specific class wins**, through the field class's MRO, across both
+  registries and whatever the order the rules are listed in, so the project's
+  rule for its own `LooseIntegerField` answers it even where a seat has a rule
+  for `forms.IntegerField`.
+- **For one class, the seat's own rules, then the project's.** A seat handed a
+  registry of its own (`FormValidator(..., json_schema_registry=...)`) answers
+  a class both name. An empty seat registry adds nothing and still reads the
+  project's.
 - **A seat can opt out** of the project's rules with `project_registry=False`.
 - **Read at the call, never at import**, so `override_settings` reaches a spec
   built before it, and leaves it when it ends.
