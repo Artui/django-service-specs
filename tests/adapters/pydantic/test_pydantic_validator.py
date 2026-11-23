@@ -19,6 +19,7 @@ from pydantic import (
     ConfigDict,
     Field,
     Strict,
+    StrictInt,
     ValidationInfo,
     computed_field,
     conlist,
@@ -309,7 +310,7 @@ class TestRefusals:
         assert detail == {
             "ranges": {
                 1: {NON_FIELD_ERRORS: [RANGE_REFUSED]},
-                2: {NON_FIELD_ERRORS: ["Input should be an object"]},
+                2: {NON_FIELD_ERRORS: ["Input should be a valid dictionary or instance of Range"]},
             }
         }
 
@@ -914,7 +915,9 @@ class _Strict(BaseModel):
     name: str | None = None
 
 
-class _Lax(BaseModel):
+class _Unwritable(BaseModel):
+    model_config = ConfigDict(strict=True)
+
     count: int | None = None
     ratio: float | None = None
     name: str | None = None
@@ -1023,16 +1026,118 @@ class TestWhatJsonCannotWriteBack:
     @pytest.mark.parametrize("sent", [10**400, -(10**400)])
     def test_an_integer_past_a_float_s_range_is_no_float(self, sent: int) -> None:
         with pytest.raises(InvalidArguments) as caught:
-            PydanticValidator(_Lax).validate({"ratio": sent}, CONTEXT)
+            PydanticValidator(_Unwritable).validate({"ratio": sent}, CONTEXT)
         assert coded(caught.value.detail) == {
             "ratio": [("Input should be a valid number", "invalid")]
         }
 
     def test_an_integer_too_long_to_write_as_json_is_still_an_int(self) -> None:
-        assert PydanticValidator(_Lax).validate({"count": 10**5000}, CONTEXT)["count"] == 10**5000
+        assert (
+            PydanticValidator(_Unwritable).validate({"count": 10**5000}, CONTEXT)["count"]
+            == 10**5000
+        )
 
     @pytest.mark.parametrize("field", ["name", "labels"])
     def test_a_lone_surrogate_json_decoded_is_taken_as_pydantic_takes_it(self, field: str) -> None:
         text = json.loads('"a\\ud800b"')
         sent = text if field == "name" else {text: "x"}
-        assert PydanticValidator(_Lax).validate({field: sent}, CONTEXT)[field] == sent
+        assert PydanticValidator(_Unwritable).validate({field: sent}, CONTEXT)[field] == sent
+
+
+class _Recorded(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _record(cls, data: Any, info: ValidationInfo) -> Any:
+        info.context["call_context"]["mode"] = info.mode
+        return data
+
+
+class _RecordedLax(_Recorded):
+    count: int | None = None
+
+
+class _RecordedNotStrict(_Recorded):
+    model_config = ConfigDict(strict=False)
+
+    count: int | None = Field(default=None, strict=False)
+
+
+class _RecordedConfig(_Recorded):
+    model_config = ConfigDict(strict=True)
+
+
+class _RecordedField(_Recorded):
+    count: int | None = Field(default=None, strict=True)
+
+
+class _RecordedAnnotated(_Recorded):
+    on: Annotated[dt.date | None, Strict()] = None
+
+
+class _RecordedStrictType(_Recorded):
+    count: StrictInt | None = None
+
+
+class _RecordedNested(_Recorded):
+    row: _StrictRow | None = None
+
+
+class _RecordedTwice(_Recorded):
+    first: _StrictRow | None = None
+    second: _StrictRow | None = None
+
+
+def _mode(model: type[BaseModel]) -> str:
+    context = ValidationContext(principal=None, call_context={})
+    PydanticValidator(model).validate({}, context)
+    return context.call_context["mode"]
+
+
+@pytest.mark.parametrize(
+    ("model", "mode"),
+    [
+        (_RecordedLax, "python"),
+        (_RecordedNotStrict, "python"),
+        (_RecordedConfig, "json"),
+        (_RecordedField, "json"),
+        (_RecordedAnnotated, "json"),
+        (_RecordedStrictType, "json"),
+        (_RecordedNested, "json"),
+        (_RecordedTwice, "json"),
+    ],
+)
+def test_only_a_model_declaring_strict_anywhere_validates_json_as_json(
+    model: type[BaseModel], mode: str
+) -> None:
+    assert _mode(model) == mode
+
+
+class _LaxDecimal(BaseModel):
+    price: Decimal
+    tags: list[int] = []
+
+
+class TestLaxModels:
+    def test_a_json_decimal_keeps_its_trailing_zero(self) -> None:
+        price = PydanticValidator(_LaxDecimal).validate({"price": 3.0}, CONTEXT)["price"]
+        assert str(price) == "3.0"
+
+    def test_a_refusal_keeps_python_mode_s_words(self) -> None:
+        with pytest.raises(InvalidArguments) as caught:
+            PydanticValidator(_LaxDecimal).validate({"price": "1", "tags": "x"}, CONTEXT)
+        assert caught.value.detail == {"tags": ["Input should be a valid list"]}
+
+
+class _StrictDated(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    on: dt.date
+
+
+class _LaxAroundStrict(BaseModel):
+    dated: _StrictDated
+
+
+def test_a_strict_nested_model_takes_its_json_inside_a_lax_one() -> None:
+    values = PydanticValidator(_LaxAroundStrict).validate({"dated": {"on": "2024-06-01"}}, CONTEXT)
+    assert values["dated"].on == dt.date(2024, 6, 1)

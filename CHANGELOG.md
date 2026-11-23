@@ -14,16 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   describes.** Decoded arguments were validated in pydantic's Python mode, where strict
   refuses a list for a `tuple[X, ...]`, an ISO string for a `date` or `datetime`, a value
   for an `Enum` and a string or number for a `Decimal`, so every JSON call matching the
-  schema was refused, whether the model or the field was strict. Arguments that are decoded
-  JSON are now validated in pydantic's JSON mode, which takes each of these under strict
-  and still refuses what strict JSON refuses, `3` for a `str` among them (the shape check
-  still reads an integer's `"3"` as 3 first). Arguments JSON cannot write back unchanged, a
-  Python caller's `date` or `Decimal`, a tuple, a string with a lone surrogate or an
-  integer past a float's range, are validated in Python mode as before. A non-strict model
-  accepts and refuses the same values; what changes for it is pydantic's JSON wording
-  ("Input should be a valid array" for a list or a tuple, "an object" for a dict or a
-  row), a validator's `info.mode`, now `"json"`, and a decimal sent as a JSON number
-  keeping no trailing zero or exponent (`3.0` is `Decimal("3")`, equal and printed so).
+  schema was refused. A model that declares strict anywhere, in its config, on a field
+  (`strict=True`, `Strict()`, `StrictInt`) or in a nested model, now validates decoded JSON
+  in pydantic's JSON mode, which takes each of these and still refuses what strict JSON
+  refuses, `3` for a `str` among them (the shape check still reads an integer's `"3"` as
+  3 first); a validator there reads `info.mode` as `"json"`. Arguments JSON cannot write
+  back unchanged, a Python caller's `date` or `Decimal`, a tuple, a string with a lone
+  surrogate or an integer past a float's range, are validated in Python mode as before. A
+  model that declares nothing strict is validated as it was.
 
 ## [0.34.3] — 2026-11-23
 
