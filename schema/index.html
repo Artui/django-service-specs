@@ -753,6 +753,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#field-schema-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Field schema rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-a-spec-returns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1005,6 +1016,17 @@
     <span class="md-ellipsis">
       
         Flat and self-contained
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#field-schema-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Field schema rules
       
     </span>
   </a>
@@ -1521,6 +1543,65 @@ The schema of that node is <code>{"type": "object"}</code>. It is the one thing 
 known to be true, it is what a caller can still send, and it constrains
 nothing a valid call could fail. An object parameter declared without fields
 is described the same way for the same reason.</p>
+<h2 id="field-schema-rules">Field schema rules<a class="headerlink" href="#field-schema-rules" title="Permanent link">&para;</a></h2>
+<p>An adapter that walks fields types each one by a table of the field classes it
+knows. A project's own field can need another answer: a <code>forms.IntegerField</code>
+subclass whose <code>to_python</code> keeps the string it was sent is still an <code>integer</code>
+by the table, so the schema says so and the shape check refuses the string
+before the field ever reads it. A
+<a class="autorefs autorefs-internal" title="JsonSchemaRegistry
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.json_schema_registry.JsonSchemaRegistry"><code>JsonSchemaRegistry</code></a>
+holds rules mapping a field class to the JSON Schema fragment it is declared
+as, and an adapter asks
+<a class="autorefs autorefs-internal" title="registered_fragment" href="../reference/#django_service_specs.schema.registered_fragment.registered_fragment"><code>registered_fragment</code></a>
+for a field's class before its own table, so a rule both declares a class the
+table has no row for and overrides one it has.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">LooseIntegerField</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">IntegerField</span><span class="p">):</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_python</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="k">return</span> <span class="n">value</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">OrderForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">code</span> <span class="o">=</span> <span class="n">LooseIntegerField</span><span class="p">()</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="n">RULES</span> <span class="o">=</span> <span class="n">JsonSchemaRegistry</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">((</span><span class="n">LooseIntegerField</span><span class="p">,</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">}),))</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="n">order_validator</span> <span class="o">=</span> <span class="n">FormValidator</span><span class="p">(</span><span class="n">OrderForm</span><span class="p">,</span> <span class="n">json_schema_registry</span><span class="o">=</span><span class="n">RULES</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Handed to the validator, <code>RULES</code> types that one seat's field. Named by the
+project's setting, it types the field for every <code>FormValidator</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">SERVICE_SPECS_FIELD_SCHEMA_REGISTRY</span> <span class="o">=</span> <span class="s2">"docs.examples.forms_adapter.RULES"</span>
+</span></code></pre></div>
+<p>With that setting, <code>FormValidator</code> declares a <code>LooseIntegerField</code> a
+<code>string</code>, and a JSON <code>"AB-12"</code> reaches the field. The rules are answered in
+this order:</p>
+<ul>
+<li><strong>The most specific class wins</strong>, through the field class's MRO, across both
+  registries and whatever the order the rules are listed in, so the project's
+  rule for its own <code>LooseIntegerField</code> answers it even where a seat has a rule
+  for <code>forms.IntegerField</code>.</li>
+<li><strong>For one class, the seat's own rules, then the project's.</strong> A seat handed a
+  registry of its own (<code>FormValidator(..., json_schema_registry=...)</code>) answers
+  a class both name. An empty seat registry adds nothing and still reads the
+  project's.</li>
+<li><strong>A seat can opt out</strong> of the project's rules with <code>project_registry=False</code>.</li>
+<li><strong>Read at the call, never at import</strong>, so <code>override_settings</code> reaches a spec
+  built before it, and leaves it when it ends.</li>
+</ul>
+<p>A fragment becomes the parameter through
+<a class="autorefs autorefs-internal" title="fragment_keywords" href="../reference/#django_service_specs.schema.fragment_keywords.fragment_keywords"><code>fragment_keywords</code></a>:
+what a parameter can state (its type, a <code>[type, "null"]</code> pair as nullable,
+a format the kernel names, an <code>enum</code> as choices, bounds, a <code>description</code> as
+help) is kept, and a keyword no parameter spells is its <code>json_schema_extra</code>.
+A rule naming a JSON type the kernel does not have is declared <code>any</code>, and a
+format the kernel has no name for is dropped. The registry imports neither
+Django's forms nor DRF: a rule names any class, so a seat that walks
+other kinds of field reads the same rules through <code>registered_fragment</code>.</p>
 <h2 id="what-a-spec-returns">What a spec returns<a class="headerlink" href="#what-a-spec-returns" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
 describes what dispatch presents, which depends on the kind of spec as well as
@@ -1595,23 +1676,23 @@ item, and dispatch presents a <code>None</code> it returned as <code>None</code>
 may return one is not otherwise in its declaration, so the spec says it with
 <code>allow_none=True</code>, the name a selector spec already uses, and the item gains
 <code>"null"</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_oldest</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">if</span> <span class="n">note</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">return</span> <span class="n">note</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">archive_oldest_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_oldest</span><span class="p">,</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="c1"># It presents what it returned, which may be nothing: said here, so the</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    <span class="c1"># schema a transport advertises admits the null it will serve.</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="p">)</span>
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="n">archive_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">archive_oldest_spec</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_oldest</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="k">if</span> <span class="n">note</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="k">return</span> <span class="n">note</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="n">archive_oldest_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_oldest</span><span class="p">,</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>    <span class="c1"># It presents what it returned, which may be nothing: said here, so the</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>    <span class="c1"># schema a transport advertises admits the null it will serve.</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>    <span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="p">)</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="n">archive_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">archive_oldest_spec</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Left undeclared, a <code>None</code> is not stated, and the item stays the strict object
 its presenter declares: a schema that admitted <code>null</code> for every write would

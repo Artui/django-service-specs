@@ -1856,6 +1856,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JsonSchemaRegistry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="JsonSchemaRegistry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry.extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.registered_fragment.registered_fragment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        registered_fragment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.fragment_keywords.fragment_keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fragment_keywords
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dataclass-adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3191,6 +3241,17 @@
     <span class="md-ellipsis">
       
         server_owned_keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.specs.route_captures.route_captures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        route_captures
       
     </span>
   </a>
@@ -5775,6 +5836,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JsonSchemaRegistry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="JsonSchemaRegistry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry.extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.registered_fragment.registered_fragment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        registered_fragment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.fragment_keywords.fragment_keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fragment_keywords
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dataclass-adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7110,6 +7221,17 @@
     <span class="md-ellipsis">
       
         server_owned_keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.specs.route_captures.route_captures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        route_captures
       
     </span>
   </a>
@@ -8563,7 +8685,7 @@ code; the subpackage paths are where each name is defined.</p>
 so they are exported from <code>django_service_specs.adapters.pydantic</code> alone, and
 importing the package root never imports pydantic.</p>
 <h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
-<p>One Django setting, read at the call rather than at import, so
+<p>Two Django settings, each read at the call rather than at import, so
 <code>override_settings</code> reaches a spec built before it. The management command's
 output format is <code>SPEC_CLI_OUTPUT</code>, read by
 <a href="https://artui.github.io/django-spec-cli/">django-spec-cli</a>.</p>
@@ -8576,6 +8698,18 @@ output format is <code>SPEC_CLI_OUTPUT</code>, read by
   <a href="../arguments/#how-long-a-list-may-be">how long a list may be</a>.
   <a class="autorefs autorefs-internal" title="flat_arguments" href="#django_service_specs.flat.flat_arguments.flat_arguments"><code>flat_arguments</code></a>
   bounds a query string's lists by the same key.</li>
+<li><strong><code>SERVICE_SPECS_FIELD_SCHEMA_REGISTRY</code></strong>: the dotted path to a
+  <a class="autorefs autorefs-internal" title="JsonSchemaRegistry
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry"><code>JsonSchemaRegistry</code></a>,
+  the project's field schema rules, read beside a seat's own, the most specific
+  class winning. Unset, there are none. A value that is no string, a path that does not
+  import, or one naming anything but a registry is refused as
+  <code>ImproperlyConfigured</code> where it is read. See
+  <a href="../schema/#field-schema-rules">field schema rules</a>.</li>
 </ul>
 <h2 id="specs">Specs<a class="headerlink" href="#specs" title="Permanent link">&para;</a></h2>
 
@@ -13746,6 +13880,185 @@ names: its kinds are another library's, and none of them is this one's
 
     </div>
 
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.json_schema_registry.JsonSchemaRegistry" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">JsonSchemaRegistry</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Rules mapping a field type to the JSON Schema fragment it is declared as.</p>
+<p>The kernel's
+<a class="autorefs autorefs-internal" title="FormValidator" href="#django_service_specs.adapters.forms.form_validator.FormValidator"><code>FormValidator</code></a>
+asks
+<a class="autorefs autorefs-internal" title="registered_fragment" href="#django_service_specs.schema.registered_fragment.registered_fragment"><code>registered_fragment</code></a>
+for a field's type before its own table, and any seat that walks fields can do
+the same, so a rule both describes a type the seat has no mapping for and
+overrides one it has: a <code>forms.IntegerField</code> subclass that reads strings is
+declared a string.</p>
+<p>A field is matched through its class's MRO, so the most specific class with a
+rule wins whatever the order the rules are listed in; two rules for one class
+are answered by the first. The registry imports neither forms nor DRF: a rule
+names any class.</p>
+<p>Immutable: <code>extend</code> returns a new registry, so there is no shared state to
+leak across callers or tests. <code>JsonSchemaRegistry()</code> is the empty one:</p>
+<div class="language-text highlight"><pre><span></span><code>registry = JsonSchemaRegistry().extend(
+    fields=[(LooseIntegerField, {"type": "string"})],
+)
+validator = FormValidator(OrderForm, json_schema_registry=registry)
+</code></pre></div>
+<p>A seat's registry is read beside the project's, which the
+<code>SERVICE_SPECS_FIELD_SCHEMA_REGISTRY</code> setting names; see
+<a href="../schema/#field-schema-rules">field schema rules</a>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.types.json_schema_registry.JsonSchemaRegistry.fields">fields</span></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="django_service_specs.types.json_schema_registry._Rule">_Rule</span>, ...]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(type, fragment)</code> rules, each a class and the JSON Schema a
+field of it is declared as.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.json_schema_registry.JsonSchemaRegistry.extend" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">extend</span>
+
+
+<a href="#django_service_specs.types.json_schema_registry.JsonSchemaRegistry.extend" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">extend</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">_Rule</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="n">JsonSchemaRegistry</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A new registry with <code>fields</code> prepended, so for one class they answer first.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.registered_fragment.registered_fragment" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">registered_fragment</span>
+
+
+<a href="#django_service_specs.schema.registered_fragment.registered_fragment" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">registered_fragment</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">field_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">registry</span><span class="p">:</span> <span class="n">JsonSchemaRegistry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">project_registry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The JSON Schema fragment a field of <code>field_type</code> is declared as, or <code>None</code>.</p>
+<p>The most specific class in <code>field_type</code>'s MRO with a rule in either
+registry wins; for one class, <code>registry</code>, the seat's own rules, answers
+before the registry the <code>SERVICE_SPECS_FIELD_SCHEMA_REGISTRY</code> setting
+names, read at the call, so <code>override_settings</code> reaches a seat built
+before it. <code>project_registry=False</code> is a seat that opts out of the
+project's rules; an empty <code>registry</code> adds no rule of its own and still
+reads the project's. <code>None</code> leaves the field to the seat's
+own table. The fragment is a copy, the caller's to change.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.fragment_keywords.fragment_keywords" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">fragment_keywords</span>
+
+
+<a href="#django_service_specs.schema.fragment_keywords.fragment_keywords" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">fragment_keywords</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">fragment</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>A registered fragment as the keywords of a <code>Parameter</code>, or of an <code>OutputField</code>.</p>
+<p>What the declaration can state is kept, and the rest is dropped by the
+declaration's own refusal: <code>type</code> (<code>"any"</code> where it names no JSON type,
+or a <code>[type, "null"]</code> pair as the type and <code>nullable</code>), <code>format</code>,
+<code>enum</code> as <code>choices</code>, a typed <code>items</code>, a parameter's bounds and
+<code>description</code> as <code>help</code>, an output field's <code>title</code> as <code>label</code>, and
+any other keyword as <code>json_schema_extra</code>. The result always has <code>type</code>.</p>
+
+
+    </div>
+
 </div><h2 id="dataclass-adapters">Dataclass adapters<a class="headerlink" href="#dataclass-adapters" title="Permanent link">&para;</a></h2>
 
 
@@ -14363,6 +14676,24 @@ naming one key are refused under <code>non_field_errors</code>, where Django's
 formset would let the last one win. Each row comes back as its form's
 <code>cleaned_data</code>, the key cleaned to its row, or <code>None</code> for a new one.
 A form field named as one of these additions is refused.</p>
+<p><strong>A field type can be declared by a rule.</strong> Before its own table, the
+adapter asks
+<a class="autorefs autorefs-internal" title="registered_fragment" href="#django_service_specs.schema.registered_fragment.registered_fragment"><code>registered_fragment</code></a>
+for the field's class: the most specific class in its MRO with a rule in
+<code>json_schema_registry</code> or in the project's, which the
+<code>SERVICE_SPECS_FIELD_SCHEMA_REGISTRY</code> setting names unless
+<code>project_registry=False</code>, the seat's answering a class both name. A rule's
+fragment is the parameter's type, read
+by <a class="autorefs autorefs-internal" title="fragment_keywords" href="#django_service_specs.schema.fragment_keywords.fragment_keywords"><code>fragment_keywords</code></a>,
+with <code>required</code> the field's, <code>nullable</code> when the field is optional or
+the fragment says so, and <code>help</code> the field's <code>help_text</code> or the
+fragment's <code>description</code>; so a <code>forms.IntegerField</code> subclass whose
+<code>to_python</code> keeps a string is a <code>"string"</code> parameter, and the shape check
+passes a string to it. The rules are read on every <code>parameters()</code>, so
+<code>override_settings</code> reaches a validator built before it. Construction
+reads them only for a field the table cannot declare, which is refused
+unless a rule declares it. A field the adapter refuses outright, a <code>JSONField</code>,
+<code>MultiValueField</code> or <code>ComboField</code>, stays refused whatever the rules say.</p>
 <p>A refusal is one
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>
 carrying the form's own errors and messages, <code>{field: [messages]}</code>, with
@@ -21557,6 +21888,94 @@ spec declares and the caller is still not asked for.</p>
 what the spec it compiles to owns. djangorestframework-services' own
 reading adds the keys its reflected
 input markers hide, which this package does not read.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.specs.route_captures.route_captures" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">route_captures</span>
+
+
+<a href="#django_service_specs.specs.route_captures.route_captures" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">route_captures</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">captured</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">mapped</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Of the names a route <code>captured</code>, those that are arguments, and those that are namesakes.</p>
+<p>For an HTTP edge merging a URL's captures into a call: it hands the names
+(<code>view.kwargs</code> itself will do, read for its keys) and merges only the
+first set. A capture holds a URL converter's <code>to_python()</code> output, while
+a Validator field reads what the caller sent, so the two cannot share a
+value. Of the names:</p>
+<ul>
+<li><strong>the first set</strong> is every capture naming a top-level parameter
+  <code>spec</code> declares that is no Validator field: a read, the target
+  selector's reads, a shape. Each is an argument
+  (test_a_capture_naming_a_declared_parameter_is_an_argument);</li>
+<li><strong>the second set</strong> is every capture named like a field of the spec's
+  Validator, a namesake. It is no argument: the field stays the
+  caller's, sent in the body, and a target selector wanting the route's
+  value reads <code>view.kwargs</code> through its <code>kwargs</code> provider, as a
+  provider's key named like a field is a namesake in
+  <a class="autorefs autorefs-internal" title="server_owned_keys" href="#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
+  (test_the_capture_rule_names_what_the_provider_rule_names). A read and
+  a field never share a name, so the split is clean; on a <code>many</code> spec
+  the fields are each row's, and a read of a row field's name wins
+  (test_a_many_spec_s_read_wins_over_a_row_field_of_its_name);</li>
+<li>a capture in neither set names nothing <code>spec</code> declares, and each edge
+  keeps its own rule for it: dropped, or refused as the host's
+  misconfiguration.</li>
+</ul>
+<p>A capture naming a <code>many</code> spec's list is refused, since the list is
+the caller's body. <code>mapped</code> is an edge's own renaming of its captures,
+capture to target, <code>None</code> dropping one: a target that is a Validator
+field is refused, naming the capture and the field, whatever the route
+captured, since no rename can make a URL value the caller's
+(test_an_identity_mapping_onto_a_field_is_refused_whatever_the_route_captured).
+The edge hands it where it checks its own configuration, and <code>captured</code>
+under the names it fills. <code>call_context</code> reaches the Validator as in
+<a class="autorefs autorefs-internal" title="provider_reached" href="#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>:
+the call's dict during a call, <code>None</code> outside one.</p>
+<p>Only a service spec with a Validator has namesakes, each conjunct held by
+its own test: a selector spec has no Validator
+(test_a_selector_spec_has_no_namesake), and a service spec may have none
+(test_a_service_spec_with_no_validator_has_no_namesake).</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>a capture names a <code>many</code> spec's list, or
+<code>mapped</code> maps a capture onto a Validator field.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
