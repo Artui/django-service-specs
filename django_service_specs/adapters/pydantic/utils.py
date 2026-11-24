@@ -95,8 +95,8 @@ class FieldShape:
     marking: FieldMarking | None
     min_length: int | None = None
     max_length: int | None = None
-    """How many elements a list field takes, as the model declares it; ``None``
-    for a bound it leaves open, and for every field that is not a list."""
+    """How many elements a list takes, or characters a plain string, as the model
+    declares it; ``None`` for a bound it leaves open, and for every other field."""
 
 
 def check_model(model: Any, *, label: str) -> None:
@@ -245,8 +245,8 @@ def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
 
 
 def _lengths(shape: Shape, metadata: tuple[Any, ...]) -> tuple[int | None, int | None]:
-    """(min_length, max_length) a list field declares, each ``None`` where it declares none."""
-    if shape.type != "array":
+    """(min_length, max_length) a list or plain string field declares, ``None`` where it is open."""
+    if shape.type != "array" and (shape.type != "string" or shape.format is not None):
         return None, None
     min_length = max_length = None
     for item in _flatten(metadata):

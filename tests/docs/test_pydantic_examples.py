@@ -104,14 +104,12 @@ class TestDeclaringWithModels:
 
 
 class TestWhatAModelDeclares:
-    def test_the_model_declares_what_the_dataclass_declares_with_the_price_s_help(self) -> None:
+    def test_the_model_declares_what_the_dataclass_declares_with_help_and_a_length(self) -> None:
         by_dataclass = DataclassValidator(declaring.AuthorIn).parameters()
         name, books = by_dataclass.get("name"), by_dataclass.get("books")
         assert books is not None and isinstance(books.items, Parameters)
-        rows = Parameters(
-            dataclasses.replace(p, help="In euros.") if p.name == "price" else p
-            for p in books.items
-        )
+        added = {"price": {"help": "In euros."}, "title": {"json_schema_extra": {"maxLength": 100}}}
+        rows = Parameters(dataclasses.replace(p, **added.get(p.name, {})) for p in books.items)
         expected = Parameters((name, dataclasses.replace(books, items=rows)))
         assert pydantic_adapter.create_author_spec.parameters() == expected
 
@@ -203,10 +201,11 @@ class TestModelJsonSchema:
             "string",
         }
 
-    def test_a_bound_is_not_described_and_is_still_enforced(self) -> None:
+    def test_a_string_s_length_is_described_and_enforced(self) -> None:
         validator = pydantic_adapter.PydanticValidator(pydantic_adapter.BookIn)
-        # A string parameter and nothing more: Parameters have no length.
-        assert validator.parameters().get("title") == Parameter("title", "string", required=True)
+        assert validator.parameters().get("title") == Parameter(
+            "title", "string", required=True, json_schema_extra={"maxLength": 100}
+        )
         with pytest.raises(InvalidArguments) as caught:
             validator.validate({"title": "x" * 101, "price": Decimal(1)}, CONTEXT)
         assert caught.value.detail == {"title": ["String should have at most 100 characters"]}

@@ -73,6 +73,14 @@ become the parameter's `min_length` and `max_length`, and a schema's
 takes 5000 tags where an undeclared list is held to the
 `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, 1000 by default, and a list the
 model allows 5 of is refused at 6 by the shape check before the model runs.
+
+**A plain string's length is declared too**, stated in any of those ways or
+with `StringConstraints`, as its `json_schema_extra` `"minLength"` and
+`"maxLength"`, the spelling `string_lengths` gives every adapter, since a
+parameter's own `min_length` and `max_length` count an array's elements. So
+`title: str = Field(max_length=100)` describes `"maxLength": 100`, and a
+transport comparing its own declaration against the spec's with
+`constraints_not_held` finds the length the model enforces.
 Where a field states a length twice, the declaration takes the one pydantic
 enforces: the last it applies, the annotation's innermost first and the
 field's own last. A length on a string or a `dict` is the model's alone,
@@ -212,9 +220,10 @@ adapter declared it, and the model's own JSON Schema is not consulted. There is
 one dialect: a `Decimal` is a `string` in the `decimal` format for a model as
 for a dataclass, where pydantic's schema describes it as a number or a
 patterned string. The price of that is that what `Parameters` cannot carry -
-a string's `max_length`, `gt`, a pattern - is not described. It is still
-enforced, by the model, in `validate()`. A list's length is the exception, as
-`Parameters` carries one and the kernel bounds every list without it.
+`gt`, a pattern - is not described. It is still enforced, by the model, in
+`validate()`. Lengths are the exception: a list's, as `Parameters` carries one
+and the kernel bounds every list without it, and a string's, which a
+transport needs to know the spec holds a form's `max_length`.
 
 A number's bounds are not declared either, although a parameter takes an
 inclusive `minimum` and `maximum`. pydantic's `gt` and `lt` are exclusive,

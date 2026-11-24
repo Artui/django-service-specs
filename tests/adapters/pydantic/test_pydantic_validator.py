@@ -20,6 +20,7 @@ from pydantic import (
     Field,
     Strict,
     StrictInt,
+    StringConstraints,
     ValidationInfo,
     computed_field,
     conlist,
@@ -1141,3 +1142,43 @@ class _LaxAroundStrict(BaseModel):
 def test_a_strict_nested_model_takes_its_json_inside_a_lax_one() -> None:
     values = PydanticValidator(_LaxAroundStrict).validate({"dated": {"on": "2024-06-01"}}, CONTEXT)
     assert values["dated"].on == dt.date(2024, 6, 1)
+
+
+class _StringLengths(BaseModel):
+    keyword: str = Field(min_length=2, max_length=100)
+    raw: Annotated[str, MaxLen(5)] = ""
+    grouped: Annotated[str, StringConstraints(min_length=1, max_length=7)] = "a"
+    nullable: Annotated[str, MaxLen(4)] | None = None
+    open: str = ""
+    when: dt.date = Field(default=dt.date(2026, 1, 1))
+
+
+class TestStringLengths:
+    def test_a_str_s_length_is_its_json_schema_extra_never_its_array_length(self) -> None:
+        params = PydanticValidator(_StringLengths).parameters()
+        assert [(p.name, p.json_schema_extra, p.min_length, p.max_length) for p in params] == [
+            ("keyword", {"minLength": 2, "maxLength": 100}, None, None),
+            ("raw", {"maxLength": 5}, None, None),
+            ("grouped", {"minLength": 1, "maxLength": 7}, None, None),
+            ("nullable", {"maxLength": 4}, None, None),
+            ("open", None, None, None),
+            ("when", None, None, None),
+        ]
+
+    def test_each_stated_length_is_the_one_pydantic_enforces(self) -> None:
+        validator = PydanticValidator(_StringLengths)
+        for param in validator.parameters():
+            lengths = param.json_schema_extra or {}
+            if "maxLength" in lengths:
+                too_long = "x" * (lengths["maxLength"] + 1)
+                refused = coded(_refusal(_StringLengths, {param.name: too_long}))
+                assert [code for _, code in refused[param.name]] == ["max_length"], param.name
+            if "minLength" in lengths:
+                too_short = "x" * (lengths["minLength"] - 1)
+                refused = coded(_refusal(_StringLengths, {param.name: too_short}))
+                assert [code for _, code in refused[param.name]] == ["min_length"], param.name
+
+    def test_the_schema_advertises_a_str_s_length(self) -> None:
+        schema = parameters_schema(PydanticValidator(_StringLengths).parameters())
+        assert schema["properties"]["keyword"]["maxLength"] == 100
+        assert schema["properties"]["keyword"]["minLength"] == 2
