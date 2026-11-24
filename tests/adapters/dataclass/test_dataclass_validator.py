@@ -1025,3 +1025,14 @@ class TestStringLengths:
         )
         with pytest.raises(ImproperlyConfigured, match=re.escape(f"is outside {bound}")):
             DataclassValidator(refused).parameters()
+
+    def test_a_default_at_exactly_its_lengths_is_taken(self) -> None:
+        @dataclass
+        class _Edge:
+            longest: Annotated[str, MaxLen(3)] = "abc"
+            shortest: Annotated[str, MinLen(2)] = "ab"
+
+        assert DataclassValidator(_Edge).validate({}, CONTEXT) == {
+            "longest": "abc",
+            "shortest": "ab",
+        }
