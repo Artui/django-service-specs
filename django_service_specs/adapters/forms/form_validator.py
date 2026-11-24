@@ -449,7 +449,7 @@ class FormValidator(Validator):
         self.form_kwargs = form_kwargs
         self.json_schema_registry = json_schema_registry
         self.project_registry = project_registry
-        fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]
+        fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[missing-attribute]
         self._names: frozenset[str] = frozenset(fields)
         self._declared: dict[str, forms.Field] = {
             name: field for name, field in fields.items() if not field.disabled
@@ -742,7 +742,7 @@ def _narrow(formset: forms.BaseModelFormSet, field: forms.Field) -> None:
 
 def _deleted(formset: forms.BaseFormSet, form: forms.BaseForm) -> bool:
     """Whether the formset reads ``form`` as marked for deletion, through its own hook."""
-    return bool(formset._should_delete_form(form))  # ty: ignore[unresolved-attribute]
+    return bool(formset._should_delete_form(form))  # ty: ignore[missing-attribute]
 
 
 def _repeated_keys(formset: forms.BaseFormSet, key: str | None) -> list[ValidationError]:
@@ -783,7 +783,7 @@ def _clear_checkbox(form_class: type[forms.BaseForm], name: str, field: forms.Fi
     if field.required or not isinstance(field.widget, forms.ClearableFileInput):
         return None
     clear = field.widget.clear_checkbox_name(name)
-    if clear in form_class.base_fields:  # ty: ignore[unresolved-attribute]
+    if clear in form_class.base_fields:  # ty: ignore[missing-attribute]
         raise ImproperlyConfigured(
             f"{form_class.__qualname__}.{name}: its clear checkbox, {clear!r}, is also the "
             "name of a field, and the two would read one argument; rename the field."
