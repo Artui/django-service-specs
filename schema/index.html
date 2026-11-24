@@ -1715,8 +1715,8 @@ selects fields" would be a claim nothing could check.</p>
 <p>What the kernel writes around the item keeps its own <code>required</code>, wherever the
 item sits: the <code>affordances</code> object dispatch adds to each row stays required,
 with its answers' schema whole, and a page's envelope still requires <code>items</code>,
-<code>page</code>, <code>totalPages</code> and <code>hasNext</code>. A spec declaring no shapes is described
-exactly as before, with the <code>required</code> its presenter's <code>always_present</code>
+<code>page</code>, <code>totalPages</code> and <code>hasNext</code>, and <code>total</code> under <code>include_total</code>. A spec
+declaring no shapes is described exactly as before, with the <code>required</code> its presenter's <code>always_present</code>
 states. <a href="../paging-and-projection/#shaping-each-row-by-the-call">Shaping each row by the call</a>
 shows a shaped list.</p>
 <h2 id="what-is-deliberately-not-emitted">What is deliberately not emitted<a class="headerlink" href="#what-is-deliberately-not-emitted" title="Permanent link">&para;</a></h2>

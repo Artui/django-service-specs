@@ -13551,7 +13551,8 @@ makes only under the handed <code>call_context</code> included
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">paginate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">projection</span><span class="p">:</span> <span class="n">AudienceProjection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">handle_description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">include_total</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -13597,7 +13598,10 @@ answer, which a transport writing a schema of its own asks too.</p>
 and <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>OutputPage.envelope</code></a>
 shape it: <code>{"items": [...], "page": n, "totalPages": n, "hasNext": b}</code>,
 every key required. It changes only a list's schema, since one row has no
-pages, so a transport may pass it for every spec it serves paged.</p>
+pages, so a transport may pass it for every spec it serves paged.
+<code>include_total</code> adds a fifth key, the integer <code>total</code>, last in
+<code>properties</code> and <code>required</code>, as an envelope written under the same flag
+carries it. Off by default, and nothing without <code>paginate</code>.</p>
 <p><code>projection</code> describes what
 <a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
 hands back rather than what <code>present</code> does, through
@@ -16619,7 +16623,8 @@ raising it.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">max_page_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputPage</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">include_total</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputPage</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16670,6 +16675,8 @@ page reports the <code>limit</code> asked for.</p>
 and the page is read once. A manager - any <code>BaseManager</code>, so one built
 with <code>BaseManager.from_queryset</code> too - is paged as its <code>.all()</code>, since
 it counts and cannot be sliced.</p>
+<p><code>include_total</code> sets the page's <code>include_total</code>, so its envelope reports <code>total</code>,
+the count already taken for the clamp, after <code>hasNext</code>. Off by default.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -26861,6 +26868,10 @@ is the drift this exists to prevent.</p>
 belongs to the caller. Hand the presented result back to
 <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>envelope</code></a>
 to get the wire shape.</p>
+<p><code>include_total</code> adds <code>total</code>, the row count across every page, to the
+envelope after <code>hasNext</code>. Off by default, so an envelope a client already
+reads keeps its keys. It is keyword-only so a subclass may still declare a
+field without a default.</p>
 
 
 
@@ -26949,9 +26960,10 @@ would describe a page the caller was just handed as not existing.</p>
 
         <p>Wrap already-presented rows in the published paging envelope.</p>
 <p><code>rendered</code> rather than <code>items</code> because an audience projection lands
-on the rows and never on the envelope: <code>page</code>, <code>totalPages</code> and
-<code>hasNext</code> are this shape's own keys and belong to no <code>Output</code>, so a
-projection walking them would look for markings that cannot exist.</p>
+on the rows and never on the envelope: <code>page</code>, <code>totalPages</code>,
+<code>hasNext</code> and <code>total</code> are this shape's own keys and belong to no
+<code>Output</code>, so a projection walking them would look for markings that
+cannot exist. Under <code>include_total</code>, <code>total</code> follows <code>hasNext</code>.</p>
 
 
     </div>

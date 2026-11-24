@@ -1208,6 +1208,12 @@ then wraps them. With three books, page 2 at a limit of 2 is:</p>
 </span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="nt">"hasNext"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 </span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="p">}</span>
 </span></code></pre></div>
+<p><code>include_total=True</code>, passed to <code>paginate_output</code> and to <code>spec_output_schema</code>
+alike, adds <code>total</code> after <code>hasNext</code>: the rows across every page, which is the
+count already taken before the slice, so it costs no query. The schema lists the
+integer <code>total</code> last in <code>properties</code> and <code>required</code>. It is off by default, and a
+transport turns it on for both or for neither, so the schema never advertises a
+key the envelope does not write.</p>
 <p>The order matters. Paging first means only the page's rows are read and
 presented. Projecting before wrapping means the projection never walks the
 envelope's keys.</p>
