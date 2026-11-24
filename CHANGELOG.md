@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-11-24
+
 ### Added
 - **`constraints_not_held(spec, form)` says which of a form's constraints a spec does not
   hold.** A transport that renders a form while another Validator runs the spec enforces
@@ -2987,7 +2989,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.37.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.38.0...HEAD
+[0.38.0]: https://github.com/Artui/django-service-specs/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/Artui/django-service-specs/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Artui/django-service-specs/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
