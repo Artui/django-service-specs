@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-11-24
+
+### Added
+- **A paged envelope can report `total`, the row count across every page.**
+  `paginate_output(..., include_total=False)` and
+  `spec_output_schema(..., include_total=False)` take the new keyword, off by default.
+  On, the page's envelope writes `total` after `hasNext`, and the paged schema adds the
+  integer `total` last to `properties` and `required`; unpaged, the schema keyword changes
+  nothing. `paginate_output` sets `OutputPage.include_total`, a keyword-only field (also
+  off), so a subclass of `OutputPage` declaring a field without a default still defines,
+  and `dataclasses.replace` carries it. Off, every envelope and schema is unchanged. The
+  count is the one already taken before the slice, so asking for it costs no query.
+
 ## [0.36.0] — 2026-11-23
 
 ### Added
@@ -2933,7 +2946,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.36.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.37.0...HEAD
+[0.37.0]: https://github.com/Artui/django-service-specs/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Artui/django-service-specs/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
 [0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4

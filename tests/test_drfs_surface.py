@@ -133,7 +133,9 @@ SURFACE: dict[str, Pin] = {
         "dispatch.audience_projection_for_spec", "spec, *, overrides=, name="
     ),
     "present_for_audience": _fn("dispatch.present_for_audience", "spec, result, *, projection="),
-    "paginate_output": _fn("dispatch.paginate_output", "rows, *, page=, limit=, max_page_size="),
+    "paginate_output": _fn(
+        "dispatch.paginate_output", "rows, *, page=, limit=, max_page_size=, include_total="
+    ),
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
     "DispatchResult": Pin(
         "dispatch.dispatch_result",
@@ -382,7 +384,8 @@ SURFACE: dict[str, Pin] = {
         "schema.spec_input_schema", "spec, *, unknown_arguments=, call_context="
     ),
     "spec_output_schema": _fn(
-        "schema.spec_output_schema", "spec, *, paginate=, projection=, handle_description="
+        "schema.spec_output_schema",
+        "spec, *, paginate=, projection=, handle_description=, include_total=",
     ),
     # --- selectors ----------------------------------------------------------------------------
     "Selector": _protocol("selectors.selector", "(*args, **kwargs)"),
@@ -444,7 +447,7 @@ SURFACE: dict[str, Pin] = {
     "NoInput": Pin("types.no_input"),
     "OutputPage": Pin(
         "types.output_page",
-        signature="items, page, limit, total",
+        signature="items, page, limit, total, *, include_total=",
         methods={"total_pages": "property", "has_next": "property", "envelope": "(rendered)"},
     ),
     "ProgressReporter": _protocol(

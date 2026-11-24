@@ -212,6 +212,13 @@ then wraps them. With three books, page 2 at a limit of 2 is:
 }
 ```
 
+`include_total=True`, passed to `paginate_output` and to `spec_output_schema`
+alike, adds `total` after `hasNext`: the rows across every page, which is the
+count already taken before the slice, so it costs no query. The schema lists the
+integer `total` last in `properties` and `required`. It is off by default, and a
+transport turns it on for both or for neither, so the schema never advertises a
+key the envelope does not write.
+
 The order matters. Paging first means only the page's rows are read and
 presented. Projecting before wrapping means the projection never walks the
 envelope's keys.
