@@ -408,6 +408,59 @@ known to be true, it is what a caller can still send, and it constrains
 nothing a valid call could fail. An object parameter declared without fields
 is described the same way for the same reason.
 
+## Field schema rules
+
+An adapter that walks fields types each one by a table of the field classes it
+knows. A project's own field can need another answer: a `forms.IntegerField`
+subclass whose `to_python` keeps the string it was sent is still an `integer`
+by the table, so the schema says so and the shape check refuses the string
+before the field ever reads it. A
+[`JsonSchemaRegistry`][django_service_specs.types.json_schema_registry.JsonSchemaRegistry]
+holds rules mapping a field class to the JSON Schema fragment it is declared
+as, and an adapter asks
+[`registered_fragment`][django_service_specs.schema.registered_fragment.registered_fragment]
+for a field's class before its own table, so a rule both declares a class the
+table has no row for and overrides one it has.
+
+```python
+--8<--
+docs/examples/forms_adapter.py:field_rules
+--8<--
+```
+
+Handed to the validator, `RULES` types that one seat's field. Named by the
+project's setting, it types the field for every `FormValidator`:
+
+```python
+SERVICE_SPECS_FIELD_SCHEMA_REGISTRY = "docs.examples.forms_adapter.RULES"
+```
+
+With that setting, `FormValidator` declares a `LooseIntegerField` a
+`string`, and a JSON `"AB-12"` reaches the field. The rules are answered in
+this order:
+
+- **The most specific class wins**, through the field class's MRO, across both
+  registries and whatever the order the rules are listed in, so the project's
+  rule for its own `LooseIntegerField` answers it even where a seat has a rule
+  for `forms.IntegerField`.
+- **For one class, the seat's own rules, then the project's.** A seat handed a
+  registry of its own (`FormValidator(..., json_schema_registry=...)`) answers
+  a class both name. An empty seat registry adds nothing and still reads the
+  project's.
+- **A seat can opt out** of the project's rules with `project_registry=False`.
+- **Read at the call, never at import**, so `override_settings` reaches a spec
+  built before it, and leaves it when it ends.
+
+A fragment becomes the parameter through
+[`fragment_keywords`][django_service_specs.schema.fragment_keywords.fragment_keywords]:
+what a parameter can state (its type, a `[type, "null"]` pair as nullable,
+a format the kernel names, an `enum` as choices, bounds, a `description` as
+help) is kept, and a keyword no parameter spells is its `json_schema_extra`.
+A rule naming a JSON type the kernel does not have is declared `any`, and a
+format the kernel has no name for is dropped. The registry imports neither
+Django's forms nor DRF: a rule names any class, so a seat that walks
+other kinds of field reads the same rules through `registered_fragment`.
+
 ## What a spec returns
 
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]

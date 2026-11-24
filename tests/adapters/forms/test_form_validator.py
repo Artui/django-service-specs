@@ -25,6 +25,7 @@ from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
+from django_service_specs.adapters.forms import form_validator as form_validator_module
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
@@ -40,12 +41,14 @@ from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Document, Edition
 from tests.parameters.utils import coded
 from tests.relations_app.models import Post, Timestamped
+from tests.schema.utils import LooseIntegerField, Point
 
 User = get_user_model()
 
@@ -2962,3 +2965,149 @@ class TestAModelFormsetThroughDispatch:
         formset = dispatch(spec, principal=None, arguments={"items": rows}).value
         assert isinstance(formset, _EditionSet)
         assert formset.is_bound
+
+
+_PROJECT_RULES = "tests.schema.utils.PROJECT_RULES"
+
+
+class _Order(forms.Form):
+    code = LooseIntegerField()
+
+
+def _rules(*fields: tuple[type, dict[str, Any]]) -> JsonSchemaRegistry:
+    return JsonSchemaRegistry(fields=fields)
+
+
+def _of(parameters: Parameters, name: str) -> Parameter:
+    found = parameters.get(name)
+    assert found is not None
+    return found
+
+
+def _order_spec(validator: FormValidator) -> ServiceSpec:
+    return ServiceSpec(
+        service=lambda **kwargs: None, permissions=[Unrestricted()], validator=validator
+    )
+
+
+class TestAFieldTypeCanBeDeclaredByARule:
+    """A registered rule types a field before the adapter's own table does."""
+
+    def test_with_no_rule_an_integer_subclass_is_an_integer(self) -> None:
+        assert _of(FormValidator(_Order).parameters(), "code").type == "integer"
+
+    def test_the_project_s_rule_types_the_field_of_a_seat_with_no_registry(self) -> None:
+        validator = FormValidator(_Order)
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            parameters = validator.parameters()
+        assert parameters_schema(parameters)["properties"]["code"] == {"type": "string"}
+
+    def test_a_string_reaches_the_form_past_the_shape_check(self) -> None:
+        spec = _order_spec(FormValidator(_Order))
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            assert bind_arguments(spec, {"code": "AB-12"}, principal=None) == {"code": "AB-12"}
+
+    def test_override_settings_reaches_a_spec_built_before_it_and_leaves_with_it(self) -> None:
+        spec = _order_spec(FormValidator(_Order))
+        assert _of(spec.parameters(), "code").type == "integer"
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            assert _of(spec.parameters(), "code").type == "string"
+        assert _of(spec.parameters(), "code").type == "integer"
+
+    def test_the_seat_s_rule_wins_over_the_project_s_for_one_type(self) -> None:
+        validator = FormValidator(
+            _Order, json_schema_registry=_rules((LooseIntegerField, {"type": "number"}))
+        )
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            assert _of(validator.parameters(), "code").type == "number"
+
+    def test_the_project_answers_a_type_the_seat_names_no_rule_for(self) -> None:
+        validator = FormValidator(
+            _Order, json_schema_registry=_rules((forms.DateField, {"type": "number"}))
+        )
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            assert _of(validator.parameters(), "code").type == "string"
+
+    def test_a_seat_that_opts_out_sees_no_project_rule(self) -> None:
+        validator = FormValidator(_Order, project_registry=False)
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            assert _of(validator.parameters(), "code").type == "integer"
+
+    def test_a_seat_s_rule_overrides_the_adapter_s_table(self) -> None:
+        validator = FormValidator(
+            Everything, json_schema_registry=_rules((forms.DateField, {"type": "integer"}))
+        )
+        parameters = validator.parameters()
+        assert (_of(parameters, "on").type, _of(parameters, "on").format) == ("integer", None)
+        assert _of(parameters, "at").format == "date-time"
+
+    def test_the_field_states_required_and_help_and_the_fragment_the_rest(self) -> None:
+        form_class = type(
+            "Coded",
+            (forms.Form,),
+            {
+                "code": LooseIntegerField(required=False, help_text="The code."),
+                "other": LooseIntegerField(),
+            },
+        )
+        fragment = {"type": ["string", "null"], "description": "A code.", "pattern": "^A"}
+        parameters = FormValidator(
+            form_class, json_schema_registry=_rules((LooseIntegerField, fragment))
+        ).parameters()
+        code, other = _of(parameters, "code"), _of(parameters, "other")
+        assert (code.type, code.required, code.nullable, code.help) == (
+            "string",
+            False,
+            True,
+            "The code.",
+        )
+        assert (other.required, other.nullable, other.help) == (True, True, "A code.")
+        assert other.json_schema_extra == {"pattern": "^A"}
+
+    def test_an_optional_field_a_rule_types_is_nullable(self) -> None:
+        form_class = type("Coded", (forms.Form,), {"code": LooseIntegerField(required=False)})
+        rules = _rules((LooseIntegerField, {"type": "string"}))
+        code = _of(FormValidator(form_class, json_schema_registry=rules).parameters(), "code")
+        assert (code.type, code.required, code.nullable) == ("string", False, True)
+
+    def test_the_table_builds_a_field_s_parameter_once_not_per_call(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        built: list[str] = []
+        real = form_validator_module._parameter
+
+        def counting(name: str, field: forms.Field, *, where: str) -> Parameter:
+            built.append(name)
+            return real(name, field, where=where)
+
+        monkeypatch.setattr(form_validator_module, "_parameter", counting)
+        validator = FormValidator(_Order)
+        for _ in range(3):
+            validator.parameters()
+        assert built == ["code"]
+
+    def test_a_field_the_table_has_no_row_for_is_declared_by_a_rule(self) -> None:
+        form_class = type("Located", (forms.Form,), {"at": Point()})
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=_PROJECT_RULES):
+            validator = FormValidator(form_class)
+            assert _of(validator.parameters(), "at").type == "string"
+        with pytest.raises(ImproperlyConfigured, match=r"Located\.at: a Point is not a field"):
+            validator.parameters()
+
+    def test_construction_reads_no_rule_for_a_field_the_table_declares(self) -> None:
+        # A setting that would be refused where it is read: construction never reads it.
+        with override_settings(SERVICE_SPECS_FIELD_SCHEMA_REGISTRY=7):
+            validator = FormValidator(Everything)
+            with pytest.raises(ImproperlyConfigured, match="SERVICE_SPECS_FIELD_SCHEMA_REGISTRY"):
+                validator.parameters()
+
+    def test_a_field_the_table_has_no_row_for_is_refused_with_no_rule(self) -> None:
+        form_class = type("Located", (forms.Form,), {"at": Point()})
+        with pytest.raises(ImproperlyConfigured, match=r"Located\.at: a Point is not a field"):
+            FormValidator(form_class)
+
+    def test_a_refused_field_stays_refused_whatever_the_rules_say(self) -> None:
+        form_class = type("Loose", (forms.Form,), {"blob": forms.JSONField()})
+        rules = _rules((forms.JSONField, {"type": "object"}))
+        with pytest.raises(ImproperlyConfigured, match=r"Loose\.blob: a JSONField takes any"):
+            FormValidator(form_class, json_schema_registry=rules)

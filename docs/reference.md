@@ -10,7 +10,7 @@ importing the package root never imports pydantic.
 
 ## Settings
 
-One Django setting, read at the call rather than at import, so
+Two Django settings, each read at the call rather than at import, so
 `override_settings` reaches a spec built before it. The management command's
 output format is `SPEC_CLI_OUTPUT`, read by
 [django-spec-cli](https://artui.github.io/django-spec-cli/).
@@ -23,6 +23,13 @@ output format is `SPEC_CLI_OUTPUT`, read by
   [how long a list may be](arguments.md#how-long-a-list-may-be).
   [`flat_arguments`][django_service_specs.flat.flat_arguments.flat_arguments]
   bounds a query string's lists by the same key.
+- **`SERVICE_SPECS_FIELD_SCHEMA_REGISTRY`**: the dotted path to a
+  [`JsonSchemaRegistry`][django_service_specs.types.json_schema_registry.JsonSchemaRegistry],
+  the project's field schema rules, read beside a seat's own, the most specific
+  class winning. Unset, there are none. A value that is no string, a path that does not
+  import, or one naming anything but a registry is refused as
+  `ImproperlyConfigured` where it is read. See
+  [field schema rules](schema.md#field-schema-rules).
 
 ## Specs
 
@@ -87,6 +94,9 @@ A spec whose result is a file, as [presenting a file](files.md) describes it.
 ::: django_service_specs.schema.parameters_schema.parameters_schema
 ::: django_service_specs.schema.output_schema.output_schema
 ::: django_service_specs.schema.can_present_nothing.can_present_nothing
+::: django_service_specs.types.json_schema_registry.JsonSchemaRegistry
+::: django_service_specs.schema.registered_fragment.registered_fragment
+::: django_service_specs.schema.fragment_keywords.fragment_keywords
 
 ## Dataclass adapters
 
@@ -199,6 +209,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.combine_progress.combine_progress
 ::: django_service_specs.pool.provider_keys.provider_keys
 ::: django_service_specs.specs.server_owned_keys.server_owned_keys
+::: django_service_specs.specs.route_captures.route_captures
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations

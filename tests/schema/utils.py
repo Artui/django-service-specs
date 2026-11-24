@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django import forms
+
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.types.json_schema_registry import JsonSchemaRegistry
 from tests.dispatch_app.models import Note
 
 
@@ -31,3 +34,20 @@ def walk(schema: dict[str, Any]) -> list[dict[str, Any]]:
     if "items" in schema:
         nodes += walk(schema["items"])
     return nodes
+
+
+class LooseIntegerField(forms.IntegerField):
+    """An integer field whose value is kept as the string it was sent as."""
+
+    def to_python(self, value: Any) -> Any:
+        return value
+
+
+class Point(forms.Field):
+    """A field no table of the forms adapter declares."""
+
+
+PROJECT_RULES = JsonSchemaRegistry(
+    fields=((LooseIntegerField, {"type": "string"}), (Point, {"type": "string"}))
+)
+NOT_A_REGISTRY = {"fields": ()}

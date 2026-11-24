@@ -598,6 +598,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "max_length_in_force",
         "refusal_messages",
         "relax_partial",
+        "route_captures",
         "sync_answer",
         # What a transport registering kernel specs reads at registration, so
         # that it refuses and relaxes what dispatch would: the transports call
@@ -640,6 +641,12 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "FileResult",
         "FileTooLarge",
         "file_output",
+        # The field schema rules a seat walking fields reads, which the
+        # transports read from this package: djangorestframework-services
+        # neither wraps nor re-exports them.
+        "JsonSchemaRegistry",
+        "fragment_keywords",
+        "registered_fragment",
     }
 )
 

@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 
 from django_service_specs import (
     FormValidator,
+    JsonSchemaRegistry,
     Parameter,
     Parameters,
     PermissionCheck,
@@ -140,3 +141,19 @@ add_lines_spec = ServiceSpec(
     validator=FormValidator(LineForm, formset_class=LineSet),
 )
 # --8<-- [end:formset]
+
+
+# --8<-- [start:field_rules]
+class LooseIntegerField(forms.IntegerField):
+    def to_python(self, value: Any) -> Any:
+        return value
+
+
+class OrderForm(forms.Form):
+    code = LooseIntegerField()
+
+
+RULES = JsonSchemaRegistry(fields=((LooseIntegerField, {"type": "string"}),))
+
+order_validator = FormValidator(OrderForm, json_schema_registry=RULES)
+# --8<-- [end:field_rules]

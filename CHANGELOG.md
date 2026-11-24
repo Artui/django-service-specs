@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-11-23
+
+### Added
+- **`route_captures(spec, captured)`: which of a route's captures are arguments.** A URL
+  capture holds a converter's `to_python()` value, while a Validator field reads what the
+  caller sent, so the two cannot share one. The helper takes the captured names
+  (`view.kwargs` will do) and answers two sets: the arguments, every capture naming a read,
+  a target selector's read or a shape; and the namesakes, every capture named like a
+  Validator field, which is no argument and leaves the field the caller's, as a provider's
+  key named like a field already does. A capture naming neither is the edge's to drop or
+  refuse. A capture naming a `many` spec's list is refused, and so is an edge's `mapped`
+  rename of a capture onto a Validator field, naming both. Names only, no resolver or
+  converter: the rule an HTTP edge splits its captures by.
+- **Field schema rules, for a seat and for the project.** `JsonSchemaRegistry` maps a field
+  class to the JSON Schema fragment it is declared as, matched through the class's MRO so the
+  most specific class wins, and imports neither Django's forms nor DRF.
+  `SERVICE_SPECS_FIELD_SCHEMA_REGISTRY` names the project's registry by dotted path, read at
+  the call, so `override_settings` reaches a spec built before it.
+  `registered_fragment(field_type, registry, *, project_registry=True)` answers a class by
+  the most specific class in its MRO with a rule in either registry, a seat's own rule
+  answering a class both name, so a project's rule for its own field class wins over a seat's
+  rule for a base; `project_registry=False` opts a seat out, and an empty seat registry adds
+  nothing and still reads the project's.
+  `fragment_keywords` turns a fragment into a `Parameter`'s or an `OutputField`'s keywords,
+  keeping what the declaration can state.
+- **`FormValidator` reads the rules before its table**, with `json_schema_registry=` and
+  `project_registry=`: a `forms.IntegerField` subclass that keeps a string can be declared a
+  `string`, so the shape check passes the string to the field. A field class the table has no
+  row for is declared by a rule. A table-declared field's parameter is built once at
+  construction; the rules and its `help` are read on every `parameters()` call.
+
+### Fixed
+- **A lazy row, such as `request.user`, is written and answers row conditions.**
+  `update_from_input` and `aupdate_from_input` on a `SimpleLazyObject` over a saved row
+  raised `AttributeError: type object 'SimpleLazyObject' has no attribute '_meta'`, and so
+  did a row-condition affordance on a dispatch whose target selector returned the lazy
+  principal (`'_base_manager'`), and a selector's row-condition answer on a lazy row. The
+  row's model is now read through `instance.__class__`, which the proxy forwards, so a
+  "my profile" selector that returns `user` works under session auth. A selector's lazy row
+  had its flag answered by a lookup keyed on the proxy's type, so fixing only the query
+  would have set every flag to `None`; both are read the same way. `ChangeResult.instance`
+  is the instance as passed: a lazy instance comes back as the same proxy.
+
 ## [0.35.0] — 2026-11-23
 
 ### Changed
@@ -2890,7 +2933,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.35.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/Artui/django-service-specs/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0
 [0.34.4]: https://github.com/Artui/django-service-specs/compare/v0.34.3...v0.34.4
 [0.34.3]: https://github.com/Artui/django-service-specs/compare/v0.34.2...v0.34.3
