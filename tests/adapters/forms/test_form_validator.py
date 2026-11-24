@@ -1318,19 +1318,19 @@ class TestAPlainFormTakingAnInstance:
         _BUILT.clear()
         context = ValidationContext(principal=None, target=target)
         assert FormValidator(form_class).validate({"name": "Ada"}, context) == {"name": "Ada"}
-        assert _BUILT[-1].instance is target  # ty: ignore[unresolved-attribute]
+        assert _BUILT[-1].instance is target  # ty: ignore[missing-attribute]
 
     @pytest.mark.django_db
     def test_a_collection_target_is_handed_as_it_is(self) -> None:
         _BUILT.clear()
         target = Author.objects.all()
         FormValidator(_Edits).validate({"name": "Ada"}, ValidationContext(None, target))
-        assert _BUILT[-1].instance is target  # ty: ignore[unresolved-attribute]
+        assert _BUILT[-1].instance is target  # ty: ignore[missing-attribute]
 
     def test_with_no_target_it_is_handed_none(self) -> None:
         _BUILT.clear()
         FormValidator(_Edits).validate({"name": "Ada"}, CONTEXT)
-        assert _BUILT[-1].instance is None  # ty: ignore[unresolved-attribute]
+        assert _BUILT[-1].instance is None  # ty: ignore[missing-attribute]
 
     @pytest.mark.parametrize("form_class", [_TakesAnything, _CollectsKeywords])
     def test_a_form_declaring_no_instance_is_built_as_before(
