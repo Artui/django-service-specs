@@ -188,6 +188,19 @@ column's `min_value=0` asks nothing of the spec. Every kernel Validator states
 a string's length with `string_lengths`, so a spec can answer it: a pydantic
 `Field(max_length=100)`, or `Annotated[str, MaxLen(100)]` on a dataclass.
 
+```python
+--8<--
+docs/examples/form_over_spec.py:held
+--8<--
+```
+
+`check_page(BookPageForm, loose_validator)` raises with two messages: the
+`title` column's `max_length` of 100, which `BookLoose` does not state, and
+the `status` column's choices, which a bare `str` does not declare.
+`held_validator` holds both. A `ModelForm` over a column with choices offers
+them whether or not the column has a default, and the price's digits are not
+compared.
+
 ### A field type of the project's own
 
 The table's answer for a project's field class can be replaced by a rule: a

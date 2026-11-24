@@ -3,10 +3,12 @@ from __future__ import annotations
 import datetime as dt
 import types
 import typing
+from collections.abc import Iterable, Iterator
 from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from annotated_types import GroupedMetadata, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Choices
 from django.db.models.manager import BaseManager
@@ -136,3 +138,25 @@ def strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:
             annotation = arms[0]
         else:
             return annotation, nullable, omittable, tuple(extras)
+
+
+def stated_lengths(metadata: Iterable[Any]) -> tuple[int | None, int | None, tuple[Any, ...]]:
+    """(min_length, max_length, a group's other members) ``annotated_types`` states; last wins."""
+    min_length = max_length = None
+    others: list[Any] = []
+    for item, in_group in _opened(metadata, in_group=False):
+        if isinstance(item, MinLen):
+            min_length = item.min_length
+        elif isinstance(item, MaxLen):
+            max_length = item.max_length
+        elif in_group:
+            others.append(item)
+    return min_length, max_length, tuple(others)
+
+
+def _opened(metadata: Iterable[Any], *, in_group: bool) -> Iterator[tuple[Any, bool]]:
+    for item in metadata:
+        if isinstance(item, GroupedMetadata):
+            yield from _opened(item, in_group=True)
+        else:
+            yield item, in_group

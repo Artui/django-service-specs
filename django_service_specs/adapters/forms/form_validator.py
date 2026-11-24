@@ -944,7 +944,7 @@ def _choices(
     field: forms.ChoiceField, *, where: str
 ) -> tuple[str, tuple[Any, ...] | None, _Labels]:
     """The JSON type a choice field's value is sent as, the values it may be, and their labels."""
-    choices = field.choices
+    choices = _static(field.choices)
     if not isinstance(choices, list):
         return "string", None, None
     pairs = tuple(
@@ -964,6 +964,13 @@ def _choices(
             "JSON type cannot be declared; give every choice a value of one JSON type."
         )
     return json_type, values, pairs
+
+
+def _static(choices: Any) -> Any:
+    """A model field's choices under the blank one Django 5 wraps them in, else ``choices``."""
+    while not isinstance(choices, list) and hasattr(choices, "blank_choice"):
+        choices = choices.choices
+    return choices
 
 
 def _flatten(choices: list[Any]) -> Iterator[tuple[Any, Any]]:

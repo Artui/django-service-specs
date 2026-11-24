@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from django import forms
+from django.db import models
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.parameters.constraints_not_held import constraints_not_held
@@ -23,6 +24,9 @@ class _Form(forms.Form):
     title = forms.CharField(max_length=100, min_length=2)
     count = forms.IntegerField(min_value=0)
     kind = forms.ChoiceField(choices=[("a", "A"), ("b", "B")])
+    # What a ModelForm builds: a column with choices and no default, and a positive integer.
+    col = models.CharField(max_length=1, choices=[("r", "Red")]).formfield()
+    stock = models.PositiveIntegerField().formfield()
 
 
 def _form(name: str) -> Parameter:
@@ -118,6 +122,16 @@ class TestBounds:
     def test_a_min_value_0_form_field_asks_nothing_of_a_bare_integer(self) -> None:
         assert _form("count").minimum is None
         assert constraints_not_held(Parameter("count", "integer"), _form("count")) == ()
+
+
+class TestAModelFormSFields:
+    def test_a_column_s_choices_with_no_default_are_held_against_the_spec(self) -> None:
+        assert constraints_not_held(Parameter("col", "string"), _form("col")) == (
+            "'col': the form takes the choices ['r'], and the spec declares none.",
+        )
+
+    def test_a_positive_integer_column_asks_nothing_of_the_spec(self) -> None:
+        assert constraints_not_held(Parameter("stock", "integer"), _form("stock")) == ()
 
 
 class TestThroughFormValidator:

@@ -8,6 +8,7 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
+import django
 import pytest
 from asgiref.sync import async_to_sync, sync_to_async
 from django import forms
@@ -19,6 +20,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import MaxLengthValidator, MinLengthValidator
+from django.db import models
 from django.db.models import QuerySet
 from django.http import QueryDict
 from django.test import override_settings
@@ -540,6 +542,44 @@ class TestANumberSBoundsStayTheForms:
                 "email": [("Enter a valid email address.", "invalid")],
             },
         )
+
+
+class _BlankWrapped:
+    """Django 5's ``BlankChoiceIterator`` in shape, which 4.2 lacks, so every version runs it."""
+
+    def __init__(self, choices: Any, blank_choice: list[tuple[str, str]]) -> None:
+        self.choices = choices
+        self.blank_choice = blank_choice
+
+    def __iter__(self) -> Iterator[tuple[Any, Any]]:
+        yield from self.blank_choice
+        yield from self.choices
+
+
+class TestAModelFieldSChoices:
+    def test_a_model_field_s_choices_with_no_default_are_declared(self) -> None:
+        # Django 5 wraps them with the blank choice; 4.2 hands a list with it first.
+        field = models.CharField(max_length=1, choices=[("r", "Red")]).formfield()
+        form_class = _form("Colour", col=field)
+        assert _declared(form_class) == [("col", "string", None, None, ("r",), True, False)]
+
+    def test_a_model_field_s_callable_choices_are_not_declared(self) -> None:
+        field = models.CharField(max_length=1, choices=lambda: [("r", "Red")]).formfield()
+        assert _declared(_form("Colour", col=field))[0][4] is None
+
+    def test_wrapped_static_choices_are_read_through_the_blank_one(self) -> None:
+        # A field's setter would normalise the stand-in to a list, so it is read directly.
+        wrapped = _BlankWrapped(_BlankWrapped([("r", "Red")], []), [("", "---------")])
+        assert form_validator_module._static(wrapped) == [("r", "Red")]
+        callable_choices = _BlankWrapped(iter(()), [("", "---------")])
+        assert form_validator_module._static(callable_choices) is callable_choices.choices
+
+    @pytest.mark.skipif(django.VERSION < (5, 0), reason="BlankChoiceIterator is Django 5's")
+    def test_the_stand_in_has_the_real_iterator_s_shape(self) -> None:
+        field = models.CharField(max_length=1, choices=[("r", "Red")]).formfield()
+        real = field.choices
+        assert type(real).__name__ == "BlankChoiceIterator"
+        assert isinstance(real.choices, list) and hasattr(real, "blank_choice")
 
 
 class TestChoices:

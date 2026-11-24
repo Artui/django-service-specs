@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
 from django_service_specs import (
@@ -23,7 +24,7 @@ from django_service_specs import (
     parameters_schema,
     present,
 )
-from docs.examples import forms_adapter
+from docs.examples import form_over_spec, forms_adapter
 from tests.adapter_app.models import Author, Book
 
 
@@ -261,3 +262,17 @@ class TestFieldRules:
         ):
             schema = parameters_schema(validator.parameters())
         assert schema["properties"]["code"] == {"type": "string"}
+
+
+class TestAFormOverAnotherValidatorsSpec:
+    def test_a_spec_the_form_is_tighter_than_is_refused_naming_each_constraint(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as caught:
+            form_over_spec.check_page(form_over_spec.BookPageForm, form_over_spec.loose_validator)
+        assert str(caught.value) == (
+            "'title': the form states a maximum length of 100, and the spec declares none. "
+            "'status': the form takes the choices ['draft', 'published'], and the spec declares "
+            "none."
+        )
+
+    def test_a_spec_holding_the_column_s_length_and_choices_passes(self) -> None:
+        form_over_spec.check_page(form_over_spec.BookPageForm, form_over_spec.held_validator)

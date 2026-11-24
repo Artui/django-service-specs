@@ -8,7 +8,6 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-from annotated_types import GroupedMetadata, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.adapters.utils import (
@@ -17,6 +16,7 @@ from django_service_specs.adapters.utils import (
     enum_class,
     marking,
     rows_of,
+    stated_lengths,
     strip,
     unmappable,
 )
@@ -101,6 +101,7 @@ def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[Fiel
     for f in dataclasses.fields(cls):
         where = f"{cls.__qualname__}.{f.name}"
         shape, omittable, extras = _read(hints[f.name], where=where, stack=below)
+        _check_default_length(shape, f.default, where=where)
         out.append(
             FieldShape(
                 name=f.name,
@@ -197,12 +198,15 @@ def _read(
 
 def _lengths(extras: tuple[Any, ...], *, where: str) -> tuple[int | None, int | None]:
     """(min_length, max_length) the ``annotated_types`` among ``extras`` state, the last of each."""
-    min_length = max_length = None
-    for item in _opened(extras):
-        if isinstance(item, MinLen):
-            min_length = _count(item.min_length, where=where)
-        elif isinstance(item, MaxLen):
-            max_length = _count(item.max_length, where=where)
+    stated_min, stated_max, others = stated_lengths(extras)
+    if others:
+        raise ImproperlyConfigured(
+            f"{where}: a group of constraints also states {list(others)!r}, which this adapter "
+            "does not apply; only a MinLen or MaxLen is read, so state the rest in the "
+            "service or validate with a pydantic model."
+        )
+    min_length = None if stated_min is None else _count(stated_min, where=where)
+    max_length = None if stated_max is None else _count(stated_max, where=where)
     if min_length is not None and max_length is not None and min_length > max_length:
         raise ImproperlyConfigured(
             f"{where}: a minimum length of {min_length} past the maximum of {max_length} "
@@ -211,16 +215,24 @@ def _lengths(extras: tuple[Any, ...], *, where: str) -> tuple[int | None, int | 
     return min_length, max_length
 
 
-def _opened(extras: tuple[Any, ...]) -> list[Any]:
-    """Each piece of metadata, a ``Len`` or other group opened where it stands."""
-    out: list[Any] = []
-    for item in extras:
-        out.extend(_opened(tuple(item)) if isinstance(item, GroupedMetadata) else [item])
-    return out
-
-
 def _count(value: Any, *, where: str) -> int:
     """A length as stated, refused unless it is a whole count of characters."""
     if type(value) is not int or value < 0:
         raise ImproperlyConfigured(f"{where}: a length is a count of characters; got {value!r}.")
     return value
+
+
+def _check_default_length(shape: Shape, default: Any, *, where: str) -> None:
+    """Refuse a ``str`` default outside the lengths its own field states."""
+    if not isinstance(default, str):
+        return
+    if shape.max_length is not None and len(default) > shape.max_length:
+        bound = f"a maximum length of {shape.max_length}"
+    elif shape.min_length is not None and len(default) < shape.min_length:
+        bound = f"a minimum length of {shape.min_length}"
+    else:
+        return
+    raise ImproperlyConfigured(
+        f"{where}: the default {default!r} is outside {bound} the field states, so a call "
+        "leaving it out would hand on a value no caller could send."
+    )

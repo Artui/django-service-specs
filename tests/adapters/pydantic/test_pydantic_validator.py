@@ -1150,7 +1150,9 @@ class _StringLengths(BaseModel):
     grouped: Annotated[str, StringConstraints(min_length=1, max_length=7)] = "a"
     nullable: Annotated[str, MaxLen(4)] | None = None
     open: str = ""
-    when: dt.date = Field(default=dt.date(2026, 1, 1))
+    when: Annotated[dt.date, MaxLen(10)] = dt.date(2026, 1, 1)
+    tags: list[str] = Field(default=[], max_length=2)
+    level: Annotated[Literal["low", "high"], MaxLen(4)] = "low"
 
 
 class TestStringLengths:
@@ -1163,6 +1165,8 @@ class TestStringLengths:
             ("nullable", {"maxLength": 4}, None, None),
             ("open", None, None, None),
             ("when", None, None, None),
+            ("tags", None, None, 2),
+            ("level", None, None, None),
         ]
 
     def test_each_stated_length_is_the_one_pydantic_enforces(self) -> None:

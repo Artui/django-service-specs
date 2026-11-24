@@ -11,6 +11,7 @@ from annotated_types import Len, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.test import override_settings
 from django.utils import translation
+from pydantic import StringConstraints
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.parameters.check_arguments import check_arguments
@@ -898,6 +899,10 @@ def test_a_homogeneous_tuple_is_declared_an_array_and_decoded_to_a_tuple() -> No
     assert held["rows"] == (Address("Oslo", None),)
 
 
+class _Text(str):
+    pass
+
+
 @dataclass
 class _Lengths:
     title: Annotated[str, MaxLen(100)]
@@ -972,6 +977,12 @@ class TestStringLengths:
             pytest.param(Annotated[str, MaxLen(-1)], "got -1", id="negative"),
             pytest.param(Annotated[str, MaxLen(True)], "got True", id="a-bool"),
             pytest.param(Annotated[str, Len(5, 2)], "minimum length of 5 past", id="crossed"),
+            pytest.param(
+                Annotated[str, StringConstraints(strip_whitespace=True, max_length=3)],
+                "also states [_PydanticGeneralMetadata(strip_whitespace=True)]",
+                id="a-group-stating-more-than-a-length",
+            ),
+            pytest.param(Annotated[_Text, MaxLen(3)], "_Text", id="a-str-subclass"),
         ],
     )
     def test_a_length_that_takes_no_string_is_refused(self, annotation: Any, message: str) -> None:
@@ -979,3 +990,38 @@ class TestStringLengths:
         with pytest.raises(ImproperlyConfigured, match=re.escape(message)) as caught:
             DataclassValidator(refused).parameters()
         assert "_Bad.field" in str(caught.value)
+
+    def test_a_fixed_length_takes_a_string_of_exactly_that_length(self) -> None:
+        @dataclass
+        class _Code:
+            code: Annotated[str, Len(2, 2)]
+
+        assert DataclassValidator(_Code).parameters().get("code").json_schema_extra == {
+            "minLength": 2,
+            "maxLength": 2,
+        }
+        assert DataclassValidator(_Code).validate({"code": "ab"}, CONTEXT) == {"code": "ab"}
+
+    def test_a_group_of_lengths_alone_is_read(self) -> None:
+        @dataclass
+        class _Grouped:
+            code: Annotated[str, StringConstraints(min_length=1, max_length=3)]
+
+        stated = DataclassValidator(_Grouped).parameters().get("code").json_schema_extra
+        assert stated == {"minLength": 1, "maxLength": 3}
+
+    @pytest.mark.parametrize(
+        ("annotation", "default", "bound"),
+        [
+            pytest.param(Annotated[str, MaxLen(3)], "abcdef", "a maximum length of 3", id="long"),
+            pytest.param(Annotated[str, MinLen(2)], "", "a minimum length of 2", id="short"),
+        ],
+    )
+    def test_a_default_outside_its_own_lengths_is_refused(
+        self, annotation: Any, default: str, bound: str
+    ) -> None:
+        refused = dataclass(
+            type("_Bad", (), {"__annotations__": {"field": annotation}, "field": default})
+        )
+        with pytest.raises(ImproperlyConfigured, match=re.escape(f"is outside {bound}")):
+            DataclassValidator(refused).parameters()
