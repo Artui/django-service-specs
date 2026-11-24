@@ -1176,6 +1176,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.string_lengths.string_lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        string_lengths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.constraints_not_held.constraints_not_held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        constraints_not_held
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#flat-sources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5149,6 +5171,28 @@
     <span class="md-ellipsis">
       
         clean_held_to_their_columns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.string_lengths.string_lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        string_lengths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.constraints_not_held.constraints_not_held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        constraints_not_held
       
     </span>
   </a>
@@ -11175,6 +11219,74 @@ project's form, holds it to the same columns with the same words.</p>
 
     </div>
 
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.parameters.string_lengths.string_lengths" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">string_lengths</span>
+
+
+<a href="#django_service_specs.parameters.string_lengths.string_lengths" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">string_lengths</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span> <span class="n">min_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">max_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>A string's lengths as the <code>json_schema_extra</code> a <code>Parameter</code> states them in.</p>
+<p><code>Parameter.min_length</code> and <code>max_length</code> count an array's elements and are
+refused on any other type, so a string's lengths travel as the JSON Schema
+keywords <code>minLength</code> and <code>maxLength</code>. Every Validator that projects a
+string's length states it through this, so <code>constraints_not_held</code> and every
+schema read one spelling. <code>None</code> where neither is given, which is what a
+<code>Parameter</code> with no <code>json_schema_extra</code> holds.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.parameters.constraints_not_held.constraints_not_held" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">constraints_not_held</span>
+
+
+<a href="#django_service_specs.parameters.constraints_not_held.constraints_not_held" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">constraints_not_held</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">Parameter</span><span class="p">,</span> <span class="n">form</span><span class="p">:</span> <span class="n">Parameter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Each constraint <code>form</code> states that <code>spec</code> does not hold, one message apiece.</p>
+<p>For a transport that renders or reads a field through its own declaration, a
+Django form for one, while the spec's Validator is what runs: a constraint
+only the form states is never enforced, and the value it would have refused
+reaches the database. <code>form</code> is that declaration read as a <code>Parameter</code>
+(<code>FormValidator(form_class).parameters()</code>), and <code>spec</code> the spec's own
+parameter of the same name. Empty when the spec holds everything:</p>
+<ul>
+<li><strong>A string's lengths</strong>, read from <code>json_schema_extra</code> as
+  <code>string_lengths</code> states them: a <code>maxLength</code> the spec does not declare,
+  or declares above the form's, and a <code>minLength</code> the spec does not
+  declare, or declares below the form's.</li>
+<li><strong>Choices</strong>: the spec's must all be among the form's, so a value the form
+  never offers is never taken. A spec with no choices under a form with some
+  is refused.</li>
+</ul>
+<p>A spec tighter than the form passes. Numeric bounds are never compared:
+<code>FormValidator</code> declares no <code>minimum</code> or <code>maximum</code>, so a
+<code>PositiveIntegerField</code> column's <code>min_value=0</code> asks nothing of the spec.
+Each message names the field, the form's value and the spec's; the caller
+raises, with its own words about where the form came from.</p>
+
+
+    </div>
+
 </div><h2 id="flat-sources">Flat sources<a class="headerlink" href="#flat-sources" title="Permanent link">&para;</a></h2>
 
 
@@ -14127,6 +14239,12 @@ types and builds the instance, nested dataclasses included.</p>
 <li><code>X | UnsetType</code>: the argument may be left out, with or without a
   default, and the field then holds <code>UNSET</code> rather than a value a
   service would act on. It adds no JSON type, since no wire can send it.</li>
+<li><code>Annotated[str, MaxLen(n)]</code>, <code>MinLen(n)</code> or <code>Len(min, max)</code>, from
+  <code>annotated_types</code>: a string's length, the words pydantic reads too.
+  It is the parameter's <code>json_schema_extra</code> <code>maxLength</code> and
+  <code>minLength</code>, as <code>string_lengths</code> spells them, and is enforced with
+  Django's length validators, in their words and codes. Read on a plain
+  <code>str</code> only, so a length on any other annotation is refused.</li>
 </ul>
 <p>A field with a default, or a <code>default_factory</code>, is optional, and one with
 neither is required. Only a plain default is reported as the Parameter's
@@ -14984,13 +15102,17 @@ and <code>list[Decimal]</code> declares each element a <code>decimal</code>, wit
 homogeneous <code>tuple[X, ...]</code> declared as the same array. On top of
 those:</p>
 <ul>
-<li>
-<p>a list's length, however the model states it - <code>Field(min_length=,
+<li>a list's length, however the model states it - <code>Field(min_length=,
   max_length=)</code>, <code>conlist</code>, <code>annotated_types</code>' <code>Len</code>, <code>MinLen</code>
   and <code>MaxLen</code> - is the parameter's <code>min_length</code> and <code>max_length</code>,
   so a list the model allows more of than <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code>
   is not held to it. Where a field states one twice, the last pydantic
-  applies is the one declared, as it is the one pydantic enforces. A
+  applies is the one declared, as it is the one pydantic enforces;</li>
+<li>
+<p>a plain <code>str</code>'s length, stated the same ways (<code>StringConstraints</code>
+  too), is its <code>json_schema_extra</code> <code>minLength</code> and <code>maxLength</code>, as
+  <code>string_lengths</code> spells them, since a parameter's own lengths count
+  an array's elements. A
   number's bounds are not declared: <code>gt</code> and <code>lt</code> are exclusive,
   which a parameter cannot state, and the model keeps every bound in
   its own words rather than some in the kernel's;</p>

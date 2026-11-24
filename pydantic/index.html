@@ -1135,7 +1135,14 @@ become the parameter's <code>min_length</code> and <code>max_length</code>, and 
 <code>"minItems"</code> and <code>"maxItems"</code>. So <code>tags: list[str] = Field(max_length=5000)</code>
 takes 5000 tags where an undeclared list is held to the
 <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default, and a list the
-model allows 5 of is refused at 6 by the shape check before the model runs.
+model allows 5 of is refused at 6 by the shape check before the model runs.</p>
+<p><strong>A plain string's length is declared too</strong>, stated in any of those ways or
+with <code>StringConstraints</code>, as its <code>json_schema_extra</code> <code>"minLength"</code> and
+<code>"maxLength"</code>, the spelling <code>string_lengths</code> gives every adapter, since a
+parameter's own <code>min_length</code> and <code>max_length</code> count an array's elements. So
+<code>title: str = Field(max_length=100)</code> describes <code>"maxLength": 100</code>, and a
+transport comparing its own declaration against the spec's with
+<code>constraints_not_held</code> finds the length the model enforces.
 Where a field states a length twice, the declaration takes the one pydantic
 enforces: the last it applies, the annotation's innermost first and the
 field's own last. A length on a string or a <code>dict</code> is the model's alone,
@@ -1267,9 +1274,10 @@ adapter declared it, and the model's own JSON Schema is not consulted. There is
 one dialect: a <code>Decimal</code> is a <code>string</code> in the <code>decimal</code> format for a model as
 for a dataclass, where pydantic's schema describes it as a number or a
 patterned string. The price of that is that what <code>Parameters</code> cannot carry -
-a string's <code>max_length</code>, <code>gt</code>, a pattern - is not described. It is still
-enforced, by the model, in <code>validate()</code>. A list's length is the exception, as
-<code>Parameters</code> carries one and the kernel bounds every list without it.</p>
+<code>gt</code>, a pattern - is not described. It is still enforced, by the model, in
+<code>validate()</code>. Lengths are the exception: a list's, as <code>Parameters</code> carries one
+and the kernel bounds every list without it, and a string's, which a
+transport needs to know the spec holds a form's <code>max_length</code>.</p>
 <p>A number's bounds are not declared either, although a parameter takes an
 inclusive <code>minimum</code> and <code>maximum</code>. pydantic's <code>gt</code> and <code>lt</code> are exclusive,
 which a parameter cannot state, and its bounds may be a <code>Decimal</code> or a date,

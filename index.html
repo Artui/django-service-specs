@@ -944,8 +944,9 @@ declaration rather than repeating it.</p>
 <p><strong>Django is the base, and the only one.</strong> There is no pure-Python protocol
 layer beneath the kernel and no Django-free subpackage inside it. A principal
 is a Django user, a target is a model row, a transaction is Django's. Django
-is the only framework the package depends on, and <code>typing_extensions</code> its only
-other dependency.</p>
+is the only framework the package depends on, and <code>typing_extensions</code> and
+<code>annotated-types</code>, whose <code>MaxLen</code> states a dataclass string's length in the
+words pydantic reads, its only other dependencies.</p>
 <p><strong>DRF is an adapter, never a dependency.</strong> The package exists so a Django
 project with business logic and no API framework can hand its operations to an
 agent, a command or a queue. Nothing in <code>django_service_specs</code> imports
