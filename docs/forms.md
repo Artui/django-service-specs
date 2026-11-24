@@ -173,6 +173,21 @@ Refused, with `ImproperlyConfigured`:
 - Any field class the table does not cover, a project's own included, unless
   a [field schema rule](#a-field-type-of-the-projects-own) declares it.
 
+### A form over another Validator's spec
+
+A transport that renders a form while a different Validator runs the spec, a
+`ModelForm` page over a dataclass or pydantic spec, enforces only what the
+spec holds: a `max_length` only the form states is never run, and the value
+it would have refused reaches the column. `constraints_not_held(spec, form)`
+compares one parameter of each, the form's read through `FormValidator`, and
+returns one message per constraint the spec does not hold: a string's
+`maxLength` it lacks or states looser, a `minLength` the same, and choices
+the form does not offer. A spec tighter than the form holds it. Bounds are
+never compared, since this adapter declares none, so a `PositiveIntegerField`
+column's `min_value=0` asks nothing of the spec. Every kernel Validator states
+a string's length with `string_lengths`, so a spec can answer it: a pydantic
+`Field(max_length=100)`, or `Annotated[str, MaxLen(100)]` on a dataclass.
+
 ### A field type of the project's own
 
 The table's answer for a project's field class can be replaced by a rule: a

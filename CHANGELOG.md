@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`constraints_not_held(spec, form)` says which of a form's constraints a spec does not
+  hold.** A transport that renders a form while another Validator runs the spec enforces
+  only what the spec holds, so a `max_length` only the form states never ran and the value
+  reached the column. It compares one `Parameter` of each, the form's read through
+  `FormValidator`, and returns one message per constraint, naming the field, the form's
+  value and the spec's: a string's `maxLength` the spec lacks or states above the form's,
+  a `minLength` it lacks or states below, and choices that are not all among the form's.
+  A spec tighter than the form holds it. Numeric bounds are never compared, since
+  `FormValidator` declares none. It raises nothing; the caller does.
+- **`string_lengths(min_length=, max_length=)` states a string's lengths as
+  `json_schema_extra`** (`minLength`, `maxLength`), the one spelling every Validator uses,
+  since `Parameter.min_length` and `max_length` count an array's elements. `FormValidator`
+  builds a `CharField`'s lengths through it, its output unchanged.
+- **`PydanticValidator` declares a plain `str`'s length.** `Field(max_length=, min_length=)`,
+  `MaxLen`, `MinLen`, `Len` and `StringConstraints` become the parameter's
+  `json_schema_extra` `maxLength` and `minLength`, so a schema advertises them; they were
+  dropped before. pydantic still enforces them.
+- **`DataclassValidator` takes a string's length** as `Annotated[str, MaxLen(n)]`,
+  `MinLen(n)` or `Len(min, max)` from `annotated_types`, the words pydantic reads. It is
+  declared as `json_schema_extra` and enforced with Django's length validators, in their
+  words and codes, on a list's elements too. A length on anything but a plain `str`, a
+  negative or non-integer one, and a minimum past the maximum are refused with
+  `ImproperlyConfigured`, naming the field. `annotated-types>=0.6` is a new dependency.
+
 ## [0.37.0] — 2026-11-24
 
 ### Added

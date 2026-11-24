@@ -45,7 +45,7 @@ NOTES_OUTPUT = {
 BOOK_IN = {
     "type": "object",
     "properties": {
-        "title": {"type": "string"},
+        "title": {"type": "string", "maxLength": 100},
         "price": {"type": "string", "format": "decimal"},
         "status": {
             "type": "string",

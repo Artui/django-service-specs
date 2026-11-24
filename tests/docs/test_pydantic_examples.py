@@ -104,12 +104,14 @@ class TestDeclaringWithModels:
 
 
 class TestWhatAModelDeclares:
-    def test_the_model_declares_what_the_dataclass_declares_with_help_and_a_length(self) -> None:
+    def test_the_model_declares_what_the_dataclass_declares_with_the_price_s_help(self) -> None:
         by_dataclass = DataclassValidator(declaring.AuthorIn).parameters()
         name, books = by_dataclass.get("name"), by_dataclass.get("books")
         assert books is not None and isinstance(books.items, Parameters)
-        added = {"price": {"help": "In euros."}, "title": {"json_schema_extra": {"maxLength": 100}}}
-        rows = Parameters(dataclasses.replace(p, **added.get(p.name, {})) for p in books.items)
+        rows = Parameters(
+            dataclasses.replace(p, help="In euros.") if p.name == "price" else p
+            for p in books.items
+        )
         expected = Parameters((name, dataclasses.replace(books, items=rows)))
         assert pydantic_adapter.create_author_spec.parameters() == expected
 

@@ -9,6 +9,7 @@ from typing import Any, TypeVar
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.validators import MaxLengthValidator, MinLengthValidator
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext
@@ -26,6 +27,7 @@ from django_service_specs.parameters.expected_type_refusal import expected_type_
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.parameters.string_lengths import string_lengths
 from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validated import Validated
@@ -82,6 +84,12 @@ class DataclassValidator(Validator):
     - ``X | UnsetType``: the argument may be left out, with or without a
       default, and the field then holds ``UNSET`` rather than a value a
       service would act on. It adds no JSON type, since no wire can send it.
+    - ``Annotated[str, MaxLen(n)]``, ``MinLen(n)`` or ``Len(min, max)``, from
+      ``annotated_types``: a string's length, the words pydantic reads too.
+      It is the parameter's ``json_schema_extra`` ``maxLength`` and
+      ``minLength``, as ``string_lengths`` spells them, and is enforced with
+      Django's length validators, in their words and codes. Read on a plain
+      ``str`` only, so a length on any other annotation is refused.
 
     A field with a default, or a ``default_factory``, is optional, and one with
     neither is required. Only a plain default is reported as the Parameter's
@@ -209,6 +217,7 @@ def _parameter(fs: FieldShape) -> Parameter:
         choice_labels=choice_labels((shape if shape.items is None else shape.items).enum),
         default=UNSET if default is dataclasses.MISSING else encode(shape, default),
         nullable=shape.nullable,
+        json_schema_extra=string_lengths(min_length=shape.min_length, max_length=shape.max_length),
     )
 
 
@@ -324,12 +333,30 @@ def _decode_scalar(shape: Shape, value: Any) -> Any:
         return _decode_date(value)
     if not _fits(shape.type, value):
         raise _Refused(expected_type_refusal(shape.type))
+    if python is str:
+        return _decode_string(shape, value)
     if python is not float:
         return value
     try:
         return float(value)
     except OverflowError:
         raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
+
+
+def _decode_string(shape: Shape, value: str) -> str:
+    """``value``, refused in Django's words where it is shorter or longer than ``shape`` takes."""
+    checks = (
+        (MinLengthValidator, shape.min_length),
+        (MaxLengthValidator, shape.max_length),
+    )
+    for validator, limit in checks:
+        if limit is None:
+            continue
+        try:
+            validator(limit)(value)
+        except ValidationError as exc:
+            raise _Refused(coded_messages([exc])[0]) from None
+    return value
 
 
 def _decode_decimal(value: Any) -> Decimal:

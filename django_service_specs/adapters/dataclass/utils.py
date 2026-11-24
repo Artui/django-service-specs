@@ -8,6 +8,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from annotated_types import GroupedMetadata, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.adapters.utils import (
@@ -41,6 +42,8 @@ class Shape:
     items: Shape | None = None
     fields: tuple[FieldShape, ...] | None = None
     values: Shape | None = None
+    min_length: int | None = None
+    max_length: int | None = None
 
     @property
     def enum(self) -> type[Enum] | None:
@@ -177,4 +180,47 @@ def _read(
         shape = Shape(json_type, python=base, format=fmt, nullable=nullable)
     else:
         raise unmappable(base, where=where, supported=_SUPPORTED)
-    return shape, omittable, extras
+    min_length, max_length = _lengths(extras, where=where)
+    if min_length is None and max_length is None:
+        return shape, omittable, extras
+    if base is not str:
+        raise ImproperlyConfigured(
+            f"{where}: a MinLen, MaxLen or Len is read on a plain str only, the one annotation "
+            "whose length this adapter holds a value to."
+        )
+    return (
+        dataclasses.replace(shape, min_length=min_length, max_length=max_length),
+        omittable,
+        extras,
+    )
+
+
+def _lengths(extras: tuple[Any, ...], *, where: str) -> tuple[int | None, int | None]:
+    """(min_length, max_length) the ``annotated_types`` among ``extras`` state, the last of each."""
+    min_length = max_length = None
+    for item in _opened(extras):
+        if isinstance(item, MinLen):
+            min_length = _count(item.min_length, where=where)
+        elif isinstance(item, MaxLen):
+            max_length = _count(item.max_length, where=where)
+    if min_length is not None and max_length is not None and min_length > max_length:
+        raise ImproperlyConfigured(
+            f"{where}: a minimum length of {min_length} past the maximum of {max_length} "
+            "takes no string."
+        )
+    return min_length, max_length
+
+
+def _opened(extras: tuple[Any, ...]) -> list[Any]:
+    """Each piece of metadata, a ``Len`` or other group opened where it stands."""
+    out: list[Any] = []
+    for item in extras:
+        out.extend(_opened(tuple(item)) if isinstance(item, GroupedMetadata) else [item])
+    return out
+
+
+def _count(value: Any, *, where: str) -> int:
+    """A length as stated, refused unless it is a whole count of characters."""
+    if type(value) is not int or value < 0:
+        raise ImproperlyConfigured(f"{where}: a length is a count of characters; got {value!r}.")
+    return value

@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any
 
+from annotated_types import MaxLen
 from django.db.models import QuerySet
 
 from django_service_specs import (
@@ -56,7 +57,7 @@ list_notes_spec = SelectorSpec(
 # --8<-- [start:validator]
 @dataclass
 class BookIn:
-    title: str
+    title: Annotated[str, MaxLen(100)]
     price: Decimal
     status: Status = Status.DRAFT
     published_on: date | None = None
