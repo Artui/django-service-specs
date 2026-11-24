@@ -16,6 +16,7 @@ from django_service_specs.adapters.utils import (
     enum_class,
     marking,
     rows_of,
+    stated_lengths,
     strip,
     unmappable,
 )
@@ -41,6 +42,8 @@ class Shape:
     items: Shape | None = None
     fields: tuple[FieldShape, ...] | None = None
     values: Shape | None = None
+    min_length: int | None = None
+    max_length: int | None = None
 
     @property
     def enum(self) -> type[Enum] | None:
@@ -98,6 +101,7 @@ def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[Fiel
     for f in dataclasses.fields(cls):
         where = f"{cls.__qualname__}.{f.name}"
         shape, omittable, extras = _read(hints[f.name], where=where, stack=below)
+        _check_default_length(shape, f.default, where=where)
         out.append(
             FieldShape(
                 name=f.name,
@@ -177,4 +181,58 @@ def _read(
         shape = Shape(json_type, python=base, format=fmt, nullable=nullable)
     else:
         raise unmappable(base, where=where, supported=_SUPPORTED)
-    return shape, omittable, extras
+    min_length, max_length = _lengths(extras, where=where)
+    if min_length is None and max_length is None:
+        return shape, omittable, extras
+    if base is not str:
+        raise ImproperlyConfigured(
+            f"{where}: a MinLen, MaxLen or Len is read on a plain str only, the one annotation "
+            "whose length this adapter holds a value to."
+        )
+    return (
+        dataclasses.replace(shape, min_length=min_length, max_length=max_length),
+        omittable,
+        extras,
+    )
+
+
+def _lengths(extras: tuple[Any, ...], *, where: str) -> tuple[int | None, int | None]:
+    """(min_length, max_length) the ``annotated_types`` among ``extras`` state, the last of each."""
+    stated_min, stated_max, others = stated_lengths(extras)
+    if others:
+        raise ImproperlyConfigured(
+            f"{where}: a group of constraints also states {list(others)!r}, which this adapter "
+            "does not apply; only a MinLen or MaxLen is read, so state the rest in the "
+            "service or validate with a pydantic model."
+        )
+    min_length = None if stated_min is None else _count(stated_min, where=where)
+    max_length = None if stated_max is None else _count(stated_max, where=where)
+    if min_length is not None and max_length is not None and min_length > max_length:
+        raise ImproperlyConfigured(
+            f"{where}: a minimum length of {min_length} past the maximum of {max_length} "
+            "takes no string."
+        )
+    return min_length, max_length
+
+
+def _count(value: Any, *, where: str) -> int:
+    """A length as stated, refused unless it is a whole count of characters."""
+    if type(value) is not int or value < 0:
+        raise ImproperlyConfigured(f"{where}: a length is a count of characters; got {value!r}.")
+    return value
+
+
+def _check_default_length(shape: Shape, default: Any, *, where: str) -> None:
+    """Refuse a ``str`` default outside the lengths its own field states."""
+    if not isinstance(default, str):
+        return
+    if shape.max_length is not None and len(default) > shape.max_length:
+        bound = f"a maximum length of {shape.max_length}"
+    elif shape.min_length is not None and len(default) < shape.min_length:
+        bound = f"a minimum length of {shape.min_length}"
+    else:
+        return
+    raise ImproperlyConfigured(
+        f"{where}: the default {default!r} is outside {bound} the field states, so a call "
+        "leaving it out would hand on a value no caller could send."
+    )

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from annotated_types import GroupedMetadata, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured
 from pydantic import BaseModel, RootModel
 from pydantic.errors import PydanticUndefinedAnnotation
@@ -18,6 +17,7 @@ from django_service_specs.adapters.utils import (
     choice_type,
     enum_class,
     marking,
+    stated_lengths,
     strip,
     unmappable,
 )
@@ -95,8 +95,8 @@ class FieldShape:
     marking: FieldMarking | None
     min_length: int | None = None
     max_length: int | None = None
-    """How many elements a list field takes, as the model declares it; ``None``
-    for a bound it leaves open, and for every field that is not a list."""
+    """How many elements a list takes, or characters a plain string, as the model
+    declares it; ``None`` for a bound it leaves open, and for every other field."""
 
 
 def check_model(model: Any, *, label: str) -> None:
@@ -245,25 +245,19 @@ def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
 
 
 def _lengths(shape: Shape, metadata: tuple[Any, ...]) -> tuple[int | None, int | None]:
-    """(min_length, max_length) a list field declares, each ``None`` where it declares none."""
-    if shape.type != "array":
+    """(min_length, max_length) a list or plain string field declares, ``None`` where it is open."""
+    plain = shape.type == "string" and shape.format is None and shape.choices is None
+    if shape.type != "array" and not plain:
         return None, None
-    min_length = max_length = None
-    for item in _flatten(metadata):
-        if isinstance(item, MinLen):
-            min_length = item.min_length
-        elif isinstance(item, MaxLen):
-            max_length = item.max_length
+    min_length, max_length, _ = stated_lengths(_flatten(metadata))
     return min_length, max_length
 
 
 def _flatten(metadata: Iterable[Any]) -> Iterator[Any]:
-    """Each piece of metadata, with every group opened where it stands."""
+    """Each piece of metadata, with every ``Field(...)`` opened where it stands."""
     for item in metadata:
         if isinstance(item, FieldInfo):
             yield from _flatten(item.metadata)
-        elif isinstance(item, GroupedMetadata):
-            yield from _flatten(item)
         else:
             yield item
 

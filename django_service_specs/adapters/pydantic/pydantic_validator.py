@@ -23,6 +23,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.parameters.string_lengths import string_lengths
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -53,7 +54,11 @@ class PydanticValidator(Validator):
       and ``MaxLen`` - is the parameter's ``min_length`` and ``max_length``,
       so a list the model allows more of than ``SERVICE_SPECS_MAX_ARRAY_LENGTH``
       is not held to it. Where a field states one twice, the last pydantic
-      applies is the one declared, as it is the one pydantic enforces. A
+      applies is the one declared, as it is the one pydantic enforces;
+    - a plain ``str``'s length, stated the same ways (``StringConstraints``
+      too), is its ``json_schema_extra`` ``minLength`` and ``maxLength``, as
+      ``string_lengths`` spells them, since a parameter's own lengths count
+      an array's elements. A
       number's bounds are not declared: ``gt`` and ``lt`` are exclusive,
       which a parameter cannot state, and the model keeps every bound in
       its own words rather than some in the kernel's;
@@ -254,8 +259,11 @@ def _parameter(fs: FieldShape) -> Parameter:
         fields=None if shape.fields is None else _parameters(shape.fields),
         choices=shape.choices if shape.items is None else shape.items.choices,
         choice_labels=choice_labels((shape if shape.items is None else shape.items).enum),
-        min_length=fs.min_length,
-        max_length=fs.max_length,
+        min_length=fs.min_length if shape.type == "array" else None,
+        max_length=fs.max_length if shape.type == "array" else None,
+        json_schema_extra=None
+        if shape.type == "array"
+        else string_lengths(min_length=fs.min_length, max_length=fs.max_length),
         default=fs.default,
         nullable=shape.nullable,
         help=fs.help,

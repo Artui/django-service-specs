@@ -18,8 +18,9 @@ Everything else follows from two decisions, and both read as limitations.
 **Django is the base, and the only one.** There is no pure-Python protocol
 layer beneath the kernel and no Django-free subpackage inside it. A principal
 is a Django user, a target is a model row, a transaction is Django's. Django
-is the only framework the package depends on, and `typing_extensions` its only
-other dependency.
+is the only framework the package depends on, and `typing_extensions` and
+`annotated-types`, whose `MaxLen` states a dataclass string's length in the
+words pydantic reads, its only other dependencies.
 
 **DRF is an adapter, never a dependency.** The package exists so a Django
 project with business logic and no API framework can hand its operations to an

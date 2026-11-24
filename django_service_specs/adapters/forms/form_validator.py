@@ -28,6 +28,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.parameters.string_lengths import string_lengths
 from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.schema.fragment_keywords import fragment_keywords
 from django_service_specs.schema.registered_fragment import registered_fragment
@@ -914,7 +915,7 @@ def _lengths(field: forms.Field) -> dict[str, int] | None:
         if type(limit) is not int or limit < 0:
             continue
         lengths[keyword] = tightest(lengths.get(keyword, limit), limit)
-    return lengths or None
+    return string_lengths(min_length=lengths.get("minLength"), max_length=lengths.get("maxLength"))
 
 
 _Labels = tuple[tuple[Any, Any], ...] | None
@@ -943,7 +944,7 @@ def _choices(
     field: forms.ChoiceField, *, where: str
 ) -> tuple[str, tuple[Any, ...] | None, _Labels]:
     """The JSON type a choice field's value is sent as, the values it may be, and their labels."""
-    choices = field.choices
+    choices = _static(field.choices)
     if not isinstance(choices, list):
         return "string", None, None
     pairs = tuple(
@@ -963,6 +964,13 @@ def _choices(
             "JSON type cannot be declared; give every choice a value of one JSON type."
         )
     return json_type, values, pairs
+
+
+def _static(choices: Any) -> Any:
+    """A model field's choices under the blank one Django 5 wraps them in, else ``choices``."""
+    while not isinstance(choices, list) and hasattr(choices, "blank_choice"):
+        choices = choices.choices
+    return choices
 
 
 def _flatten(choices: list[Any]) -> Iterator[tuple[Any, Any]]:

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-11-24
+
+### Added
+- **`constraints_not_held(spec, form)` says which of a form's constraints a spec does not
+  hold.** A transport that renders a form while another Validator runs the spec enforces
+  only what the spec holds, so a `max_length` only the form states never ran and the value
+  reached the column. It compares one `Parameter` of each, the form's read through
+  `FormValidator`, and returns one message per constraint, naming the field, the form's
+  value and the spec's: a string's `maxLength` the spec lacks or states above the form's,
+  a `minLength` it lacks or states below, and choices that are not all among the form's.
+  A spec tighter than the form holds it. Numeric bounds are never compared, since
+  `FormValidator` declares none. It raises nothing; the caller does.
+- **`string_lengths(min_length=, max_length=)` states a string's lengths as
+  `json_schema_extra`** (`minLength`, `maxLength`), the one spelling every Validator uses,
+  since `Parameter.min_length` and `max_length` count an array's elements. `FormValidator`
+  builds a `CharField`'s lengths through it, its output unchanged.
+- **`PydanticValidator` declares a plain `str`'s length.** `Field(max_length=, min_length=)`,
+  `MaxLen`, `MinLen`, `Len` and `StringConstraints` become the parameter's
+  `json_schema_extra` `maxLength` and `minLength`, so a schema advertises them; they were
+  dropped before. pydantic still enforces them.
+- **`DataclassValidator` takes a string's length** as `Annotated[str, MaxLen(n)]`,
+  `MinLen(n)` or `Len(min, max)` from `annotated_types`, the words pydantic reads. It is
+  declared as `json_schema_extra` and enforced with Django's length validators, in their
+  words and codes. On a list's elements, `list[Annotated[str, MaxLen(n)]]`, it is enforced
+  under each index and not declared, as with pydantic. A negative or non-integer length, a
+  minimum past the maximum, a group such as `StringConstraints` stating more than a length,
+  and a `str` default outside its own lengths are refused with `ImproperlyConfigured`,
+  naming the field. Both adapters read the lengths through one reader.
+- **`annotated-types>=0.6` is a new dependency**, the floor pydantic 2.11 declares, so a
+  dataclass states a length in the words pydantic reads.
+
+### Changed
+- **A `MinLen`, `MaxLen` or `Len` that `DataclassValidator` cannot apply is refused**
+  rather than ignored: on anything but a plain `str` (an `int`, a list, a `Literal`, an
+  `Enum`), building the validator's parameters raises `ImproperlyConfigured` naming the
+  field. Under `PydanticValidator` a list's `MaxLen` stays the list's own length.
+
+### Fixed
+- **`FormValidator` declares a model field's choices on Django 5.** A `ModelForm` field over
+  a column with choices and no default holds them inside Django's `BlankChoiceIterator`,
+  and was declared with no choices, so nothing held a spec to them; it now declares them as
+  Django 4.2 did. Callable choices are still not declared.
+
 ## [0.37.0] — 2026-11-24
 
 ### Added
@@ -2946,7 +2989,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.37.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.38.0...HEAD
+[0.38.0]: https://github.com/Artui/django-service-specs/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/Artui/django-service-specs/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Artui/django-service-specs/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Artui/django-service-specs/compare/v0.34.4...v0.35.0

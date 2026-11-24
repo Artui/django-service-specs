@@ -203,10 +203,11 @@ class TestModelJsonSchema:
             "string",
         }
 
-    def test_a_bound_is_not_described_and_is_still_enforced(self) -> None:
+    def test_a_string_s_length_is_described_and_enforced(self) -> None:
         validator = pydantic_adapter.PydanticValidator(pydantic_adapter.BookIn)
-        # A string parameter and nothing more: Parameters have no length.
-        assert validator.parameters().get("title") == Parameter("title", "string", required=True)
+        assert validator.parameters().get("title") == Parameter(
+            "title", "string", required=True, json_schema_extra={"maxLength": 100}
+        )
         with pytest.raises(InvalidArguments) as caught:
             validator.validate({"title": "x" * 101, "price": Decimal(1)}, CONTEXT)
         assert caught.value.detail == {"title": ["String should have at most 100 characters"]}

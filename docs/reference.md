@@ -52,6 +52,8 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ::: django_service_specs.parameters.expected_type_refusal.expected_type_refusal
 ::: django_service_specs.parameters.max_length_in_force.max_length_in_force
 ::: django_service_specs.parameters.clean_held_to_their_columns.clean_held_to_their_columns
+::: django_service_specs.parameters.string_lengths.string_lengths
+::: django_service_specs.parameters.constraints_not_held.constraints_not_held
 
 ## Flat sources
 

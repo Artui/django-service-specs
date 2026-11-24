@@ -109,7 +109,7 @@ default, and `published_on` and `pk` may be null:
       "items": {
         "type": "object",
         "properties": {
-          "title": {"type": "string"},
+          "title": {"type": "string", "maxLength": 100},
           "price": {"type": "string", "format": "decimal"},
           "status": {
             "type": "string",

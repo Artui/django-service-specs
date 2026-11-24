@@ -449,6 +449,7 @@ wheels = [
 name = "django-service-specs"
 source = { editable = "." }
 dependencies = [
+    { name = "annotated-types" },
     { name = "django" },
     { name = "typing-extensions" },
 ]
@@ -486,6 +487,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "annotated-types", specifier = ">=0.6" },
     { name = "django", specifier = ">=4.2" },
     { name = "django-filter", marker = "extra == 'filter'", specifier = ">=23.1" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11" },

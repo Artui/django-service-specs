@@ -799,6 +799,7 @@ docs/examples/declaring.py:validator
 | a dataclass | An object, with its fields as nested Parameters. |
 | `dict[str, X]`, for any `X` above | An object with no declared fields, as the pydantic adapter declares one, since Parameters cannot say "every value is an `X`". Each value is decoded as `X` and refused under its own key: `{"scores": {"rigour": ["Expected an integer."]}}`. Only a `str` key, since a JSON object has no other. |
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
+| `Annotated[str, MaxLen(n)]`, `MinLen(n)` or `Len(min, max)` | A string's length, from `annotated_types`, the words pydantic reads too: declared as the parameter's `json_schema_extra` `maxLength` and `minLength` and enforced in Django's words, `"Ensure this value has at most 100 characters (it has 101)."`. Read on a plain `str` only; on any other annotation it is refused, naming the field. |
 
 A field with a default or a `default_factory` is optional; one with neither is
 required. An annotation outside the table is refused, naming the field. A
@@ -813,7 +814,8 @@ docs/examples/declaring_writes.py:dict_input
 ```
 
 What `DataclassValidator(AuthorIn)` declares, then: `name`, a required string,
-and `books`, an optional array whose rows take a required `title`, a required
+and `books`, an optional array whose rows take a required `title` of at most
+100 characters, as its column holds, a required
 `price` (a `string` in the `decimal` format), a `status` with the choices
 `draft` and `published` and the default `draft`, a nullable `published_on` in
 the `date` format, and a nullable integer `pk`. Its `validate()` returns the

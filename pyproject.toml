@@ -46,6 +46,10 @@ dependencies = [
     # and the floor is djangorestframework-services', which depends on this
     # package and cannot be asked to raise it.
     "typing_extensions>=4.14",
+    # ``DataclassValidator`` reads a string's length from ``MinLen``, ``MaxLen`` and
+    # ``Len``, the vocabulary pydantic reads too, so one annotation means one length
+    # under either adapter. 0.6 is the floor pydantic 2.11 itself declares.
+    "annotated-types>=0.6",
 ]
 
 [project.optional-dependencies]
@@ -163,7 +167,7 @@ skip-magic-trailing-comma = false
 root = ["./django_service_specs"]
 
 [tool.bumpversion]
-current_version = "0.37.0"
+current_version = "0.38.0"
 allow_dirty = false
 commit = false
 tag = false
