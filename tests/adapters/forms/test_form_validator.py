@@ -563,6 +563,7 @@ class TestAModelFieldSChoices:
         form_class = _form("Colour", col=field)
         assert _declared(form_class) == [("col", "string", None, None, ("r",), True, False)]
 
+    @pytest.mark.skipif(django.VERSION < (5, 0), reason="callable choices are Django 5's")
     def test_a_model_field_s_callable_choices_are_not_declared(self) -> None:
         field = models.CharField(max_length=1, choices=lambda: [("r", "Red")]).formfield()
         assert _declared(_form("Colour", col=field))[0][4] is None
