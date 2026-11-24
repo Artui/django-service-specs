@@ -52,10 +52,10 @@ class OutputPage:
         """Wrap already-presented rows in the published paging envelope.
 
         ``rendered`` rather than ``items`` because an audience projection lands
-        on the rows and never on the envelope: ``page``, ``totalPages`` and
-        ``hasNext`` are this shape's own keys and belong to no ``Output``, so a
-        projection walking them would look for markings that cannot exist.
-        Under ``include_total``, ``total`` follows ``hasNext``.
+        on the rows and never on the envelope: ``page``, ``totalPages``,
+        ``hasNext`` and ``total`` are this shape's own keys and belong to no
+        ``Output``, so a projection walking them would look for markings that
+        cannot exist. Under ``include_total``, ``total`` follows ``hasNext``.
         """
         wrapped: dict[str, Any] = {
             "items": rendered,

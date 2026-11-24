@@ -531,7 +531,7 @@ selects fields" would be a claim nothing could check.
 What the kernel writes around the item keeps its own `required`, wherever the
 item sits: the `affordances` object dispatch adds to each row stays required,
 with its answers' schema whole, and a page's envelope still requires `items`,
-`page`, `totalPages` and `hasNext`. A spec declaring no shapes is described
+`page`, `totalPages` and `hasNext`, and `total` under `include_total`. A spec declaring no shapes is described
 exactly as before, with the `required` its presenter's `always_present`
 states. [Shaping each row by the call](paging-and-projection.md#shaping-each-row-by-the-call)
 shows a shaped list.

@@ -201,3 +201,17 @@ def test_the_envelope_ends_with_the_total_across_every_page(count: int) -> None:
 
     assert list(envelope)[-2:] == ["hasNext", "total"]
     assert envelope["total"] == count
+
+
+@pytest.mark.django_db
+def test_the_total_of_a_queryset_is_the_one_count_already_taken(
+    django_assert_num_queries: Any,
+) -> None:
+    owner = make_user("ada")
+    Note.objects.bulk_create([Note(owner=owner, title=f"n{index}") for index in range(5)])
+
+    with django_assert_num_queries(1):
+        page = paginate_output(Note.objects.order_by("pk"), limit=2, include_total=True)
+        envelope = page.envelope([])
+
+    assert envelope["total"] == 5

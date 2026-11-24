@@ -67,7 +67,7 @@ def paginate_output(
     with ``BaseManager.from_queryset`` too - is paged as its ``.all()``, since
     it counts and cannot be sliced.
 
-    ``include_total`` sets the page's own, so its envelope reports ``total``,
+    ``include_total`` sets the page's ``include_total``, so its envelope reports ``total``,
     the count already taken for the clamp, after ``hasNext``. Off by default.
 
     Raises:
