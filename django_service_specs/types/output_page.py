@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -20,12 +20,18 @@ class OutputPage:
     belongs to the caller. Hand the presented result back to
     [`envelope`][django_service_specs.types.output_page.OutputPage.envelope]
     to get the wire shape.
+
+    ``include_total`` adds ``total``, the row count across every page, to the
+    envelope after ``hasNext``. Off by default, so an envelope a client already
+    reads keeps its keys. It is keyword-only so a subclass may still declare a
+    field without a default.
     """
 
     items: Any
     page: int
     limit: int
     total: int
+    include_total: bool = field(default=False, kw_only=True)
 
     @property
     def total_pages(self) -> int:
@@ -49,10 +55,14 @@ class OutputPage:
         on the rows and never on the envelope: ``page``, ``totalPages`` and
         ``hasNext`` are this shape's own keys and belong to no ``Output``, so a
         projection walking them would look for markings that cannot exist.
+        Under ``include_total``, ``total`` follows ``hasNext``.
         """
-        return {
+        wrapped: dict[str, Any] = {
             "items": rendered,
             "page": self.page,
             "totalPages": self.total_pages,
             "hasNext": self.has_next,
         }
+        if self.include_total:
+            wrapped["total"] = self.total
+        return wrapped

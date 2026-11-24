@@ -189,3 +189,15 @@ async def test_a_limit_past_any_integer_column_serves_every_row_read_async() -> 
     page = await sync_to_async(paginate_output)(Note.objects.order_by("pk"), limit=2**70)
 
     assert [note.title async for note in page.items] == ["n0", "n1", "n2", "n3", "n4"]
+
+
+def test_the_envelope_names_no_total_unless_asked() -> None:
+    assert "total" not in paginate_output(ROWS[:5], limit=2).envelope([])
+
+
+@pytest.mark.parametrize("count", [5, 1, 0], ids=["five", "one", "none"])
+def test_the_envelope_ends_with_the_total_across_every_page(count: int) -> None:
+    envelope = paginate_output(ROWS[:count], limit=2, include_total=True).envelope([])
+
+    assert list(envelope)[-2:] == ["hasNext", "total"]
+    assert envelope["total"] == count

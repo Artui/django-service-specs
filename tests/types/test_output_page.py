@@ -47,3 +47,38 @@ def test_a_page_is_frozen() -> None:
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         page.page = 2  # type: ignore[misc]
+
+
+def test_the_total_is_off_by_default() -> None:
+    page = OutputPage(items=[], page=1, limit=10, total=3)
+
+    assert page.include_total is False
+    assert "total" not in page.envelope([])
+
+
+def test_the_total_follows_has_next_when_asked_for() -> None:
+    page = OutputPage(items=[1, 2], page=1, limit=2, total=5, include_total=True)
+
+    assert list(page.envelope(["rendered"])) == ["items", "page", "totalPages", "hasNext", "total"]
+    assert page.envelope(["rendered"])["total"] == 5
+
+
+def test_replace_carries_the_flag() -> None:
+    page = OutputPage(items=[], page=1, limit=10, total=3, include_total=True)
+
+    assert dataclasses.replace(page, items=["other"]).envelope([])["total"] == 3
+
+
+def test_the_flag_is_keyword_only() -> None:
+    with pytest.raises(TypeError):
+        OutputPage([], 1, 10, 3, True)  # ty: ignore[too-many-positional-arguments]
+
+
+def test_a_subclass_adding_a_field_without_a_default_still_defines() -> None:
+    @dataclasses.dataclass(frozen=True)
+    class Aggregated(OutputPage):
+        sum: int
+
+    page = Aggregated(items=[], page=1, limit=10, total=2, sum=7, include_total=True)
+
+    assert (page.sum, page.envelope([])["total"]) == (7, 2)

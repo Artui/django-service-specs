@@ -17,6 +17,7 @@ def paginate_output(
     page: int | None = None,
     limit: int | None = None,
     max_page_size: int | None = None,
+    include_total: bool = False,
 ) -> OutputPage:
     """Slice ``rows`` into the page a transport serves.
 
@@ -66,6 +67,9 @@ def paginate_output(
     with ``BaseManager.from_queryset`` too - is paged as its ``.all()``, since
     it counts and cannot be sliced.
 
+    ``include_total`` sets the page's own, so its envelope reports ``total``,
+    the count already taken for the clamp, after ``hasNext``. Off by default.
+
     Raises:
         TypeError: ``rows`` is neither a queryset nor a sized, sliceable
             sequence, so there is nothing to count and nothing to slice.
@@ -84,6 +88,7 @@ def paginate_output(
         page=served_page,
         limit=served_limit,
         total=total,
+        include_total=include_total,
     )
 
 

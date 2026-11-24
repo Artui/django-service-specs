@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A paged envelope can report `total`, the row count across every page.**
+  `paginate_output(..., include_total=False)` and
+  `spec_output_schema(..., include_total=False)` take the new keyword, off by default.
+  On, the page's envelope writes `total` after `hasNext`, and the paged schema adds the
+  integer `total` last to `properties` and `required`; unpaged, the schema keyword changes
+  nothing. `paginate_output` sets `OutputPage.include_total`, a keyword-only field (also
+  off), so a subclass of `OutputPage` declaring a field without a default still defines,
+  and `dataclasses.replace` carries it. Off, every envelope and schema is unchanged. The
+  count is the one already taken before the slice, so asking for it costs no query.
+
 ## [0.36.0] — 2026-11-23
 
 ### Added

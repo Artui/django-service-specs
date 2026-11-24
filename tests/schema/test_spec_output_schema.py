@@ -276,6 +276,34 @@ class TestPaging:
     def test_a_spec_with_no_output_is_still_none_when_paged(self) -> None:
         assert spec_output_schema(listing(), paginate=True) is None
 
+    def test_the_total_ends_the_paged_envelope_when_asked_for(self) -> None:
+        schema = spec_output_schema(
+            listing(presenter=NoteTitle()), paginate=True, include_total=True
+        )
+
+        assert schema == {
+            **PAGED,
+            "properties": {
+                **PAGED["properties"],
+                "total": {
+                    "type": "integer",
+                    "description": "How many items match, across every page.",
+                },
+            },
+            "required": [*PAGED["required"], "total"],
+        }
+        assert list(schema["properties"])[-1] == schema["required"][-1] == "total"
+
+    def test_the_total_changes_nothing_unpaged(self) -> None:
+        spec = listing(presenter=NoteTitle())
+
+        assert spec_output_schema(spec, include_total=True) == spec_output_schema(spec)
+
+    def test_the_total_changes_nothing_that_is_not_a_list(self) -> None:
+        spec = retrieve(presenter=NoteTitle())
+
+        assert spec_output_schema(spec, paginate=True, include_total=True) == ITEM
+
 
 def projected(spec: ServiceSpec | SelectorSpec) -> dict[str, Any] | None:
     """``spec``'s output schema for an audience, with the handle wording a transport passes."""

@@ -22,6 +22,7 @@ def spec_output_schema(
     paginate: bool = False,
     projection: AudienceProjection | None = None,
     handle_description: str | None = None,
+    include_total: bool = False,
 ) -> dict[str, Any] | None:
     """The JSON Schema of what [`present`][django_service_specs.dispatch.present.present] returns
     for ``spec``.
@@ -68,6 +69,9 @@ def spec_output_schema(
     shape it: ``{"items": [...], "page": n, "totalPages": n, "hasNext": b}``,
     every key required. It changes only a list's schema, since one row has no
     pages, so a transport may pass it for every spec it serves paged.
+    ``include_total`` adds a fifth key, the integer ``total``, last in
+    ``properties`` and ``required``, as an envelope written under the same flag
+    carries it. Off by default, and nothing without ``paginate``.
 
     ``projection`` describes what
     [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
@@ -121,7 +125,7 @@ def spec_output_schema(
         return allow_null(whole) if can_present_nothing(compiled) else whole
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}
-        return _paged(array) if paginate else array
+        return _paged(array, include_total=include_total) if paginate else array
     return allow_null(item) if can_present_nothing(compiled) else item
 
 
@@ -135,15 +139,22 @@ def _unrequired(node: dict[str, Any]) -> dict[str, Any]:
     return cut
 
 
-def _paged(array: dict[str, Any]) -> dict[str, Any]:
+_TOTAL_SCHEMA: dict[str, Any] = {
+    "type": "integer",
+    "description": "How many items match, across every page.",
+}
+
+
+def _paged(array: dict[str, Any], *, include_total: bool) -> dict[str, Any]:
     """The paging envelope around ``array``, as ``OutputPage.envelope`` writes it."""
-    return {
-        "type": "object",
-        "properties": {
-            "items": array,
-            "page": {"type": "integer"},
-            "totalPages": {"type": "integer"},
-            "hasNext": {"type": "boolean"},
-        },
-        "required": ["items", "page", "totalPages", "hasNext"],
+    properties: dict[str, Any] = {
+        "items": array,
+        "page": {"type": "integer"},
+        "totalPages": {"type": "integer"},
+        "hasNext": {"type": "boolean"},
     }
+    required: list[str] = ["items", "page", "totalPages", "hasNext"]
+    if include_total:
+        properties["total"] = dict(_TOTAL_SCHEMA)
+        required.append("total")
+    return {"type": "object", "properties": properties, "required": required}
